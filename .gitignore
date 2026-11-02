@@ -1,3 +1,7 @@
 core/target/
 core/dist/
 app/.build/
+dist/
+*.ipa
+__pycache__/
+app/xtool/
