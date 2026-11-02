@@ -3,3 +3,6 @@ name = "seat-scout-core"
 version = "0.1.0"
 edition = "2021"
 publish = false
+
+[dependencies]
+roxmltree = "0.20"
