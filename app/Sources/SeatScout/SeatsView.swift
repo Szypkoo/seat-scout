@@ -173,7 +173,7 @@ struct SeatsView: View {
         return Section {
             VStack(spacing: 10) {
                 if wagon.direction == 1 || wagon.direction == -1 {
-                    Label("Kierunek jazdy (orientacyjnie)", systemImage: wagon.direction == 1 ? "arrow.up" : "arrow.down")
+                    Text("Kierunek według Intercity")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
@@ -213,7 +213,7 @@ struct SeatsView: View {
                 .font(.system(size: 28, weight: .bold))
                 .frame(width: 28)
                 .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
+                .accessibilityLabel(wagon.direction == 1 ? "Kierunek jazdy w górę" : "Kierunek jazdy w dół")
         }
     }
 
