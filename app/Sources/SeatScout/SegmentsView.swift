@@ -8,7 +8,7 @@ struct SegmentsView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Wolne miejsca (klasa 2) na kolejnych odcinkach trasy \(model.currentTrain.number). Kupujesz jeden bilet bez miejscówki i siadasz na wolnych fotelach. Aplikacja Intercity szuka fotela wolnego na całej trasie – tu składamy przejazd z foteli wolnych tylko na części trasy.")
+                    Text("Zobacz wolne miejsca w klasie 2 na kolejnych odcinkach trasy. Plan pokaże Ci, gdzie możesz usiąść i kiedy zmienić miejsce.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     if model.isLoadingSegments {
