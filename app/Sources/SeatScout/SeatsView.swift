@@ -256,7 +256,7 @@ private struct WagonMapView: View {
             ForEach(compartments?.groups ?? []) { group in
                 let bounds = compartmentBounds(group)
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.secondary.opacity(0.7), lineWidth: 2)
+                    .strokeBorder(Color.secondary.opacity(0.7), lineWidth: 1)
                     .frame(width: bounds.width - 2, height: bounds.height - 2)
                     .position(x: bounds.midX, y: bounds.midY)
                     .allowsHitTesting(false)
