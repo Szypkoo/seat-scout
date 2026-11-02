@@ -1,6 +1,14 @@
+use crate::dates;
 use crate::error::{Error, Result};
+use crate::model::WagonSeats;
 use crate::model::{Stop, Train};
+use crate::svg::parse_wagon_svg;
+use crate::transport::{fetch_json, fetch_text, Transport};
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Mutex;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 pub const GATEWAY: &str = "https://api-gateway.intercity.pl";
 const DEVICE_NO: i64 = 956;
@@ -278,5 +286,295 @@ pub fn parse_sklad(v: &Value) -> Option<Sklad> {
         schema,
         class1: nums("klasa1"),
         class2: nums("klasa2"),
+    })
+}
+
+fn endpoint(service: &str) -> String {
+    format!("{GATEWAY}/server/public/endpoint/{service}")
+}
+
+pub fn fetch_stations(transport: &dyn Transport) -> Result<Value> {
+    let v = fetch_json(
+        transport,
+        "POST",
+        &endpoint("Aktualizacja"),
+        Some(&stations_payload()),
+    )?;
+    if v.get("stacje").is_none() {
+        return Err(Error::Parse("brak pola `stacje`".into()));
+    }
+    Ok(v)
+}
+
+pub fn search_connections(
+    transport: &dyn Transport,
+    date: &str,
+    from_kod: u32,
+    to_kod: u32,
+) -> Result<Vec<Train>> {
+    if dates::iso_to_compact(&format!("{date} 00:00:00")).is_none() {
+        return Err(Error::Arg(format!(
+            "data `{date}`, wymagany format YYYY-MM-DD"
+        )));
+    }
+    let v = fetch_json(
+        transport,
+        "POST",
+        &endpoint("Pociagi"),
+        Some(&search_payload(date, from_kod, to_kod)),
+    )?;
+    parse_connections(&v)
+}
+
+pub fn train_route(
+    transport: &dyn Transport,
+    train: &Train,
+    from_eva: u32,
+    to_eva: u32,
+) -> Result<Vec<Stop>> {
+    let v = fetch_json(
+        transport,
+        "POST",
+        &endpoint("Pociagi"),
+        Some(&route_payload(train, from_eva, to_eva)),
+    )?;
+    parse_route(&v)
+}
+
+pub fn ticket_price(
+    transport: &dyn Transport,
+    train: &Train,
+    class: i64,
+    discount_code: i32,
+) -> Result<f64> {
+    let v = fetch_json(
+        transport,
+        "POST",
+        &endpoint("Sprzedaz"),
+        Some(&price_payload(train, discount_code)),
+    )?;
+    price_for_class(&v, class)
+}
+
+pub fn grm_available(transport: &dyn Transport, nr: i64, date_compact: &str) -> Result<bool> {
+    let v = fetch_json(transport, "GET", &available_url(nr, date_compact), None)?;
+    Ok(v.get("available").and_then(Value::as_bool).unwrap_or(false))
+}
+
+pub struct SegmentQuery<'a> {
+    pub category: &'a str,
+    pub train_nr: i64,
+    pub from_epa: u32,
+    pub to_epa: u32,
+    pub dep: &'a str,
+    pub arr: &'a str,
+    pub class: Option<u8>,
+    pub exclude_special: bool,
+    pub delay: Duration,
+    pub concurrency: usize,
+}
+
+struct Pacer {
+    next: Mutex<Instant>,
+    gap: Duration,
+}
+
+impl Pacer {
+    fn new(gap: Duration) -> Self {
+        Pacer {
+            next: Mutex::new(Instant::now()),
+            gap,
+        }
+    }
+
+    fn wait(&self) {
+        if self.gap.is_zero() {
+            return;
+        }
+        let slot = {
+            let mut n = self.next.lock().unwrap_or_else(|e| e.into_inner());
+            let start = (*n).max(Instant::now());
+            *n = start + self.gap;
+            start
+        };
+        let now = Instant::now();
+        if slot > now {
+            sleep(slot - now);
+        }
+    }
+}
+
+struct WagonJob {
+    wagon: i64,
+    schema: String,
+    default_class: u8,
+}
+
+fn fetch_wagon(
+    transport: &dyn Transport,
+    query: &SegmentQuery,
+    job: &WagonJob,
+    pacer: &Pacer,
+    warn: &Mutex<Vec<String>>,
+) -> Result<Vec<WagonSeats>> {
+    let note = |m: String| warn.lock().unwrap_or_else(|e| e.into_inner()).push(m);
+    let url = wagon_svg_url(
+        query.category,
+        query.train_nr,
+        job.wagon,
+        &job.schema,
+        query.from_epa,
+        query.to_epa,
+        query.dep,
+        query.arr,
+    );
+    let mut attempt = 0;
+    let svg = loop {
+        pacer.wait();
+        match fetch_text(transport, "GET", &url, None) {
+            Ok(svg) => break svg,
+            Err(e @ Error::Blocked(_)) => return Err(e),
+            Err(Error::Transport(m)) if attempt == 0 => {
+                note(format!("wagon {}: błąd sieci ({m}), ponawiam", job.wagon));
+                attempt += 1;
+                sleep(Duration::from_millis(1500));
+            }
+            Err(e) => {
+                note(format!("wagon {} pominięty: {e}", job.wagon));
+                return Ok(Vec::new());
+            }
+        }
+    };
+    if svg.is_empty() {
+        note(format!("wagon {}: pusty schemat SVG", job.wagon));
+        return Ok(Vec::new());
+    }
+    let mut rows = match parse_wagon_svg(&svg, job.default_class, query.exclude_special) {
+        Ok(r) => r,
+        Err(e) => {
+            note(format!("wagon {}: {e}", job.wagon));
+            return Ok(Vec::new());
+        }
+    };
+    if rows.is_empty() {
+        note(format!("wagon {}: w schemacie brak miejsc", job.wagon));
+    }
+    rows.retain(|ws| !query.class.is_some_and(|c| c != ws.class));
+    for ws in &mut rows {
+        ws.wagon = job.wagon as i32;
+    }
+    Ok(rows)
+}
+
+pub struct SegmentSeats {
+    pub rows: Vec<WagonSeats>,
+    pub warnings: Vec<String>,
+}
+
+pub fn seats_for_segment(
+    transport: &dyn Transport,
+    query: &SegmentQuery,
+) -> Result<Vec<WagonSeats>> {
+    seats_for_segment_ex(transport, query).map(|r| r.rows)
+}
+
+pub fn seats_for_segment_ex(
+    transport: &dyn Transport,
+    query: &SegmentQuery,
+) -> Result<SegmentSeats> {
+    let warnings: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    let note = |m: String| warnings.lock().unwrap_or_else(|e| e.into_inner()).push(m);
+    let url = sklad_url(
+        query.category,
+        query.train_nr,
+        query.from_epa,
+        query.to_epa,
+        query.dep,
+        query.arr,
+    );
+    let sklad = match fetch_json(transport, "GET", &url, None) {
+        Ok(v) => match parse_sklad(&v) {
+            Some(s) => s,
+            None => {
+                note("skład: odpowiedź bez pola `wagony`".into());
+                return Ok(SegmentSeats {
+                    rows: Vec::new(),
+                    warnings: warnings.into_inner().unwrap_or_default(),
+                });
+            }
+        },
+        Err(e @ Error::Blocked(_)) => return Err(e),
+        Err(e) => {
+            note(format!("skład niedostępny: {e}"));
+            return Ok(SegmentSeats {
+                rows: Vec::new(),
+                warnings: warnings.into_inner().unwrap_or_default(),
+            });
+        }
+    };
+    if sklad.wagons.is_empty() {
+        note("skład: pusta lista wagonów".into());
+    }
+
+    let jobs: Vec<WagonJob> = sklad
+        .wagons
+        .iter()
+        .filter_map(|&w| {
+            let Some(schema) = sklad.schema.get(&w).cloned() else {
+                note(format!("wagon {w}: brak schematu graficznego"));
+                return None;
+            };
+            let in1 = sklad.class1.contains(&w);
+            let in2 = sklad.class2.contains(&w);
+            if query.class == Some(1) && !in1 || query.class == Some(2) && !in2 {
+                return None;
+            }
+            Some(WagonJob {
+                wagon: w,
+                schema,
+                default_class: if in1 && !in2 { 1 } else { 2 },
+            })
+        })
+        .collect();
+
+    let pacer = Pacer::new(query.delay);
+    let results: Vec<Mutex<Option<Result<Vec<WagonSeats>>>>> =
+        jobs.iter().map(|_| Mutex::new(None)).collect();
+    let next = AtomicUsize::new(0);
+    let abort = AtomicBool::new(false);
+    let workers = query.concurrency.clamp(1, 8).min(jobs.len().max(1));
+
+    let work = || loop {
+        let i = next.fetch_add(1, Ordering::SeqCst);
+        if i >= jobs.len() || abort.load(Ordering::SeqCst) {
+            break;
+        }
+        let r = fetch_wagon(transport, query, &jobs[i], &pacer, &warnings);
+        if matches!(r, Err(Error::Blocked(_))) {
+            abort.store(true, Ordering::SeqCst);
+        }
+        *results[i].lock().unwrap_or_else(|e| e.into_inner()) = Some(r);
+    };
+    if workers <= 1 {
+        work();
+    } else {
+        std::thread::scope(|sc| {
+            for _ in 0..workers {
+                sc.spawn(&work);
+            }
+        });
+    }
+
+    let mut rows = Vec::new();
+    for slot in results {
+        match slot.into_inner().unwrap_or_else(|e| e.into_inner()) {
+            Some(Ok(mut r)) => rows.append(&mut r),
+            Some(Err(e)) => return Err(e),
+            None => {}
+        }
+    }
+    Ok(SegmentSeats {
+        rows,
+        warnings: warnings.into_inner().unwrap_or_default(),
     })
 }
