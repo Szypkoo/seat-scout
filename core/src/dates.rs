@@ -39,18 +39,21 @@ pub fn compact_to_minutes(c: &str) -> Option<i64> {
     if c.len() != 12 || !c.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    let n = |r: std::ops::Range<usize>| c[r].parse::<i64>().ok();
-    let (y, mo, d, h, mi) = (n(0..4)?, n(4..6)?, n(6..8)?, n(8..10)?, n(10..12)?);
-    if !(1..=12).contains(&mo) || !(1..=31).contains(&d) || h > 23 || mi > 59 {
+    let year = c[0..4].parse::<i64>().ok()?;
+    let month = c[4..6].parse::<i64>().ok()?;
+    let day = c[6..8].parse::<i64>().ok()?;
+    let hour = c[8..10].parse::<i64>().ok()?;
+    let minute = c[10..12].parse::<i64>().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 {
         return None;
     }
-    let y = if mo <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let doy = (153 * (if mo > 2 { mo - 3 } else { mo + 9 }) + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    let days = era * 146097 + doe - 719468;
-    Some(days * 1440 + h * 60 + mi)
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let year_of_era = year - era * 400;
+    let day_of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146097 + day_of_era - 719468;
+    Some(days * 1440 + hour * 60 + minute)
 }
 
 pub fn to_minutes(s: &str) -> Option<i64> {

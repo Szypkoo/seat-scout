@@ -191,7 +191,7 @@ impl Planner {
             return None;
         }
 
-        let mut plan = self.solve_cands(
+        let mut plan = self.solve_candidates(
             &self.singles(board, alight),
             board,
             alight,
@@ -212,7 +212,7 @@ impl Planner {
         }
 
         let cands = self.pairs(board, alight);
-        let mut plan = self.solve_cands(&cands, board, alight, change_penalty_min)?;
+        let mut plan = self.solve_candidates(&cands, board, alight, change_penalty_min)?;
         plan.full_ride_seats = cands
             .iter()
             .filter(|c| (board..alight).all(|l| c.mask[l]))
@@ -239,9 +239,9 @@ impl Planner {
         Some((first, second))
     }
 
-    fn solve_cands(
+    fn solve_candidates(
         &self,
-        cands: &[Cand],
+        candidates: &[Cand],
         board: usize,
         alight: usize,
         change_penalty_min: i32,
@@ -251,104 +251,116 @@ impl Planner {
         }
         let legs = alight - board;
         let wagons: Vec<i32> = {
-            let mut w: Vec<i32> = cands.iter().map(|c| c.a.wagon).collect();
-            w.sort_unstable();
-            w.dedup();
-            w
+            let mut wagon_numbers: Vec<i32> = candidates
+                .iter()
+                .map(|candidate| candidate.a.wagon)
+                .collect();
+            wagon_numbers.sort_unstable();
+            wagon_numbers.dedup();
+            wagon_numbers
         };
-        let nw = wagons.len();
-        let none = nw;
-        let widx = |wagon: i32| wagons.binary_search(&wagon).unwrap();
-        const NEG: i64 = i64::MIN / 4;
-        let k = |i: usize| i - board;
-        let mut dp = vec![vec![NEG; nw + 1]; legs + 1];
+        let wagon_count = wagons.len();
+        let no_wagon = wagon_count;
+        let wagon_index = |wagon: i32| wagons.binary_search(&wagon).unwrap();
+        const UNREACHABLE: i64 = i64::MIN / 4;
+        let relative_stop = |i: usize| i - board;
+        let mut scores = vec![vec![UNREACHABLE; wagon_count + 1]; legs + 1];
         #[derive(Clone, Copy)]
-        struct Back {
+        struct PreviousStep {
             prev_stop: usize,
             prev_state: usize,
             cand: Option<usize>,
         }
-        let mut back: Vec<Vec<Option<Back>>> = vec![vec![None; nw + 1]; legs + 1];
-        dp[0][none] = 0;
-        for s in board..alight {
-            let ks = k(s);
-            for st in 0..=nw {
-                let cur = dp[ks][st];
-                if cur == NEG {
+        let mut previous: Vec<Vec<Option<PreviousStep>>> =
+            vec![vec![None; wagon_count + 1]; legs + 1];
+        scores[0][no_wagon] = 0;
+        for stop in board..alight {
+            let stop_index = relative_stop(stop);
+            for state_index in 0..=wagon_count {
+                let current_score = scores[stop_index][state_index];
+                if current_score == UNREACHABLE {
                     continue;
                 }
-                if cur > dp[ks + 1][st] {
-                    dp[ks + 1][st] = cur;
-                    back[ks + 1][st] = Some(Back {
-                        prev_stop: s,
-                        prev_state: st,
+                if current_score > scores[stop_index + 1][state_index] {
+                    scores[stop_index + 1][state_index] = current_score;
+                    previous[stop_index + 1][state_index] = Some(PreviousStep {
+                        prev_stop: stop,
+                        prev_state: state_index,
                         cand: None,
                     });
                 }
-                for (ci, c) in cands.iter().enumerate() {
-                    if !c.mask[s] {
+                for (candidate_index, candidate) in candidates.iter().enumerate() {
+                    if !candidate.mask[stop] {
                         continue;
                     }
-                    let ns = widx(c.a.wagon);
-                    let change = if st == none {
+                    let next_state = wagon_index(candidate.a.wagon);
+                    let change = if state_index == no_wagon {
                         0
                     } else {
                         change_penalty_min as i64 * 1000
-                            + (i64::from(wagons[st]) - i64::from(c.a.wagon)).abs()
+                            + (i64::from(wagons[state_index]) - i64::from(candidate.a.wagon)).abs()
                     };
-                    let mut m = s;
-                    while m < alight && c.mask[m] {
-                        m += 1;
-                        let km = k(m);
-                        let val =
-                            cur + self.span_minutes(s, m) as i64 * 1000 + c.window_bonus - change;
-                        if val > dp[km][ns] {
-                            dp[km][ns] = val;
-                            back[km][ns] = Some(Back {
-                                prev_stop: s,
-                                prev_state: st,
-                                cand: Some(ci),
+                    let mut end_stop = stop;
+                    while end_stop < alight && candidate.mask[end_stop] {
+                        end_stop += 1;
+                        let end_index = relative_stop(end_stop);
+                        let score = current_score
+                            + self.span_minutes(stop, end_stop) as i64 * 1000
+                            + candidate.window_bonus
+                            - change;
+                        if score > scores[end_index][next_state] {
+                            scores[end_index][next_state] = score;
+                            previous[end_index][next_state] = Some(PreviousStep {
+                                prev_stop: stop,
+                                prev_state: state_index,
+                                cand: Some(candidate_index),
                             });
                         }
                     }
                 }
             }
         }
-        let (mut best_state, mut best) = (none, NEG);
-        for (st, v) in dp[legs].iter().enumerate() {
+        let (mut best_state, mut best) = (no_wagon, UNREACHABLE);
+        for (state_index, v) in scores[legs].iter().enumerate() {
             if *v > best {
                 best = *v;
-                best_state = st;
+                best_state = state_index;
             }
         }
-        if best == NEG {
+        if best == UNREACHABLE {
             return None;
         }
-        let mut raw: Vec<(Back, usize)> = Vec::new();
+        let mut raw: Vec<(PreviousStep, usize)> = Vec::new();
         let (mut stop, mut state) = (alight, best_state);
         while stop > board {
-            let b = back[k(stop)][state]?;
-            raw.push((b, stop));
-            stop = b.prev_stop;
-            state = b.prev_state;
+            let step = previous[relative_stop(stop)][state]?;
+            raw.push((step, stop));
+            stop = step.prev_stop;
+            state = step.prev_state;
         }
         raw.reverse();
         let mut runs: Vec<PlanRun> = Vec::new();
-        for (b, end) in raw {
-            let minutes = self.span_minutes(b.prev_stop, end);
-            let (seat, seat2, window) = match b.cand {
-                Some(ci) => (Some(cands[ci].a), cands[ci].b, cands[ci].window),
+        for (step, end) in raw {
+            let minutes = self.span_minutes(step.prev_stop, end);
+            let (seat, seat2, window) = match step.cand {
+                Some(candidate_index) => (
+                    Some(candidates[candidate_index].a),
+                    candidates[candidate_index].b,
+                    candidates[candidate_index].window,
+                ),
                 None => (None, None, false),
             };
             match runs.last_mut() {
                 Some(last)
-                    if last.seat == seat && last.seat2 == seat2 && last.to_stop == b.prev_stop =>
+                    if last.seat == seat
+                        && last.seat2 == seat2
+                        && last.to_stop == step.prev_stop =>
                 {
                     last.to_stop = end;
                     last.minutes += minutes;
                 }
                 _ => runs.push(PlanRun {
-                    from_stop: b.prev_stop,
+                    from_stop: step.prev_stop,
                     to_stop: end,
                     seat,
                     seat2,
