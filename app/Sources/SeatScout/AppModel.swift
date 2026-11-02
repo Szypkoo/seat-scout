@@ -12,6 +12,7 @@ final class AppModel: ObservableObject {
     @Published var toastMessage: String?
     @Published var isLive: Bool = false
     @Published var isLoading: Bool = false
+    @Published private(set) var isLoadingDetails = false
 
     @Published var showSearch = false
     @Published var isSearching = false
@@ -137,6 +138,8 @@ final class AppModel: ObservableObject {
         max(0, (ticketPrices[0] ?? currentTrain.basePrice) - calculatedPrice)
     }
 
+    var hasDepartureTime: Bool { departureDate != nil }
+
     var formattedCountdown: String {
         let h = remainingSeconds / 3600
         let m = (remainingSeconds % 3600) / 60
@@ -154,7 +157,12 @@ final class AppModel: ObservableObject {
     }
 
     func selectTrain(_ index: Int) {
-        if selectedTrainIndex != index { detailWagons = [] }
+        if selectedTrainIndex != index {
+            detailWagons = []
+            ticketPrices = [:]
+            priceNote = nil
+            departureDate = nil
+        }
         selectedTrainIndex = index
         triggerHaptic()
         showToast("Wybrano: \(trains[index].number) \(trains[index].name)")
@@ -344,6 +352,12 @@ final class AppModel: ObservableObject {
 
     func pickSearchResult(_ index: Int) {
         guard trains.indices.contains(index) else { return }
+        if selectedTrainIndex != index {
+            detailWagons = []
+            ticketPrices = [:]
+            priceNote = nil
+            departureDate = nil
+        }
         selectedTrainIndex = index
         showSearch = false
         selectedTab = .live
@@ -368,6 +382,8 @@ final class AppModel: ObservableObject {
               let core = coreTrains[currentTrain.id] else { return }
         detailsToken += 1
         let token = detailsToken
+        isLoadingDetails = true
+        defer { if token == detailsToken { isLoadingDetails = false } }
         departureDate = Self.format("yyyy-MM-dd HH:mm:ss").date(from: core.departure)
         tick()
         log(.info, "app", "szczegóły: \(core.category) \(core.number) \(core.name)")

@@ -54,10 +54,23 @@ struct SeatsView: View {
             List {
                 sourceSection
                 if sourceWagons.isEmpty {
-                    Section {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text(model.isLive ? "Pobieram miejsca w wagonach…" : "Brak danych na żywo").foregroundStyle(.secondary)
+                    if model.isLoadingDetails || model.isLoadingSegments {
+                        Section {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 8) {
+                                    ForEach(0..<4, id: \.self) { _ in LoadingBar(width: 58, height: 44) }
+                                }
+                                LoadingBar(width: 150)
+                                LoadingBar(height: 180)
+                            }
+                            .padding(.vertical, 4)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Pobieram miejsca w wagonach")
+                        }
+                    } else {
+                        Section {
+                            Text(model.isLive ? "Brak danych o miejscach" : "Wybierz połączenie, aby zobaczyć miejsca")
+                                .foregroundStyle(.secondary)
                         }
                     }
                 } else {

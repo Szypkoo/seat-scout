@@ -7,9 +7,13 @@ struct LiveView: View {
         NavigationStack {
             List {
                 if !model.isLive {
-                    Section {
-                        Text(model.isLoading ? "Pobieram połączenia…" : "Wybierz połączenie, aby zobaczyć szczegóły.")
-                            .foregroundStyle(.secondary)
+                    if model.isLoading {
+                        loadingSection
+                    } else {
+                        Section {
+                            Text("Wybierz połączenie, aby zobaczyć szczegóły.")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     TripSection()
@@ -28,10 +32,14 @@ struct LiveView: View {
                                     .background(.blue, in: Capsule())
                             }
 
-                            Text(model.formattedCountdown)
-                                .font(.system(.largeTitle, design: .rounded).monospacedDigit().weight(.bold))
-                                .foregroundStyle(.green)
-                                .contentTransition(.numericText())
+                            if model.hasDepartureTime {
+                                Text(model.formattedCountdown)
+                                    .font(.system(.largeTitle, design: .rounded).monospacedDigit().weight(.bold))
+                                    .foregroundStyle(.green)
+                                    .contentTransition(.numericText())
+                            } else if model.isLoadingDetails {
+                                LoadingBar(width: 165, height: 36)
+                            }
 
                             Text("Odjazd \(model.currentTrain.fromStation) o \(model.currentTrain.departureTime)")
                                 .font(.subheadline)
@@ -52,6 +60,16 @@ struct LiveView: View {
                                     ProgressView(value: Double(model.currentTrain.freeSeatsCount), total: Double(total))
                                         .tint(.green)
                                 }
+                            } else if model.isLoadingDetails {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    LoadingBar(width: 100)
+                                    LoadingBar(height: 8)
+                                }
+                                .accessibilityLabel("Pobieram dane o miejscach")
+                            } else {
+                                Text("Brak danych o miejscach")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                         .padding(.vertical, 4)
@@ -88,6 +106,15 @@ struct LiveView: View {
                                 Text(note).font(.footnote)
                             } icon: {
                                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            }
+                        } else if model.ticketPrices.isEmpty && model.currentTrain.basePrice <= 0 {
+                            LabeledContent("Cena") {
+                                if model.isLoadingDetails {
+                                    LoadingBar(width: 75, height: 20)
+                                        .accessibilityLabel("Pobieram cenę")
+                                } else {
+                                    Text("Brak danych").foregroundStyle(.secondary)
+                                }
                             }
                         } else {
                             LabeledContent("Cena") {
@@ -131,5 +158,31 @@ struct LiveView: View {
                 }
             }
         }
+    }
+    private var loadingSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 14) {
+                LoadingBar(width: 160)
+                LoadingBar(width: 220, height: 24)
+                LoadingBar(width: 185)
+                LoadingBar(height: 8)
+            }
+            .padding(.vertical, 8)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Pobieram połączenia")
+        }
+    }
+
+}
+
+
+struct LoadingBar: View {
+    var width: CGFloat? = nil
+    var height: CGFloat = 14
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 5)
+            .fill(Color(.tertiarySystemFill))
+            .frame(width: width, height: height)
     }
 }
