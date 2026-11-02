@@ -1,0 +1,4 @@
+module CSeatScout {
+    header "seat_scout.h"
+    export *
+}
