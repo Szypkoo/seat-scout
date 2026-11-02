@@ -161,30 +161,65 @@ struct LiveView: View {
             }
         }
     }
+    @ViewBuilder
     private var loadingSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 14) {
-                LoadingBar(width: 160)
-                LoadingBar(width: 220, height: 24)
-                LoadingBar(width: 185)
-                LoadingBar(height: 8)
+            VStack(alignment: .leading, spacing: 10) {
+                LoadingBar(width: 150, height: 18)
+                LoadingBar(width: 205)
+                LoadingBar(width: 120)
             }
-            .padding(.vertical, 8)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Pobieram połączenia")
+            .padding(.vertical, 4)
+        } header: {
+            Text("Gdzie jest pociąg")
         }
-    }
 
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                LoadingBar(width: 130, height: 16)
+                LoadingBar(width: 190)
+                LoadingBar(width: 155, height: 34)
+                HStack {
+                    LoadingBar(width: 105)
+                    Spacer()
+                    LoadingBar(width: 50)
+                }
+                LoadingBar(height: 6)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Na żywo")
+        }
+
+        Section("Połączenie") {
+            ForEach(0..<3, id: \.self) { _ in
+                HStack {
+                    LoadingBar(width: 145)
+                    Spacer()
+                    LoadingBar(width: 45)
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pobieram połączenia")
+    }
 }
 
-
 struct LoadingBar: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPulsing = false
+
     var width: CGFloat? = nil
     var height: CGFloat = 14
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 5)
+        RoundedRectangle(cornerRadius: min(height / 2, 6))
             .fill(Color(.tertiarySystemFill))
             .frame(width: width, height: height)
+            .opacity(isPulsing && !reduceMotion ? 0.45 : 1)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: isPulsing)
+            .onAppear { isPulsing = true }
+            .accessibilityHidden(true)
     }
 }

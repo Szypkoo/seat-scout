@@ -56,16 +56,46 @@ struct SeatsView: View {
                 if sourceWagons.isEmpty {
                     if model.isLoadingDetails || model.isLoadingSegments {
                         Section {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 8) {
-                                    ForEach(0..<4, id: \.self) { _ in LoadingBar(width: 58, height: 44) }
+                            HStack(spacing: 8) {
+                                ForEach(0..<4, id: \.self) { _ in
+                                    LoadingBar(width: 56, height: 48)
                                 }
-                                LoadingBar(width: 150)
-                                LoadingBar(height: 180)
                             }
+                            .padding(.vertical, 2)
+                        } header: {
+                            Text("Wagon")
+                        }
+                        Section {
+                            ForEach(0..<2, id: \.self) { _ in
+                                HStack {
+                                    LoadingBar(width: 125)
+                                    Spacer()
+                                    LoadingBar(width: 55)
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                        Section {
+                            VStack(spacing: 12) {
+                                ForEach(0..<4, id: \.self) { _ in
+                                    HStack(spacing: 8) {
+                                        LoadingBar(width: 36, height: 36)
+                                        LoadingBar(width: 36, height: 36)
+                                        Spacer(minLength: 20)
+                                        LoadingBar(width: 36, height: 36)
+                                        LoadingBar(width: 36, height: 36)
+                                    }
+                                }
+                            }
+                            .padding(16)
+                            .frame(maxWidth: 250)
+                            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.secondary.opacity(0.2)))
+                            .frame(maxWidth: .infinity)
                             .padding(.vertical, 4)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel("Pobieram miejsca w wagonach")
+                        } header: {
+                            Text("Mapa wagonu")
                         }
                     } else {
                         Section {
