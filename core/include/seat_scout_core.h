@@ -126,6 +126,7 @@ typedef struct TcSeatReport TcSeatReport;
 TcSeatReport *tc_parse_wagon_svg(const char *svg, size_t len, int default_class,
                                  int exclude_special);
 int32_t tc_report_direction(const TcSeatReport *r);
+int32_t tc_report_compartments(const TcSeatReport *r, size_t index);
 size_t tc_report_count(const TcSeatReport *r);
 int tc_report_get(const TcSeatReport *r, size_t index, TcWagon *out);
 

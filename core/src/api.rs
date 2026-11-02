@@ -477,6 +477,7 @@ fn fetch_wagon(
 
 pub struct SegmentSeats {
     pub direction: i32,
+    pub schema: std::collections::HashMap<i64, String>,
     pub rows: Vec<WagonSeats>,
     pub warnings: Vec<String>,
 }
@@ -509,6 +510,7 @@ pub fn seats_for_segment_ex(
                 note("skład: odpowiedź bez pola `wagony`".into());
                 return Ok(SegmentSeats {
                     direction: 0,
+                    schema: Default::default(),
                     rows: Vec::new(),
                     warnings: warnings.into_inner().unwrap_or_default(),
                 });
@@ -519,6 +521,7 @@ pub fn seats_for_segment_ex(
             note(format!("skład niedostępny: {e}"));
             return Ok(SegmentSeats {
                 direction: 0,
+                schema: Default::default(),
                 rows: Vec::new(),
                 warnings: warnings.into_inner().unwrap_or_default(),
             });
@@ -587,6 +590,7 @@ pub fn seats_for_segment_ex(
     }
     Ok(SegmentSeats {
         direction: sklad.direction,
+        schema: sklad.schema,
         rows,
         warnings: warnings.into_inner().unwrap_or_default(),
     })

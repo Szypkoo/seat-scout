@@ -169,7 +169,7 @@ struct SeatsView: View {
 
     private func mapSection(_ wagon: CoreWagon) -> some View {
         let wagonLayout = layout(for: wagon)
-        let compartments = CompartmentLayout(seats: wagon.seats)
+        let compartments = wagon.compartments == 1 ? CompartmentLayout(seats: wagon.seats) : nil
         return Section {
             VStack(spacing: 10) {
                 if wagon.direction == 1 || wagon.direction == -1 {
