@@ -20,12 +20,17 @@ final class AlertService: ObservableObject {
 
     @Published private(set) var backgroundStatus = "jeszcze nie planowano"
     @Published private(set) var diagnostics = ""
+    @Published private(set) var backgroundRefreshAvailability = "Sprawdzanie"
+    @Published private(set) var backgroundRequestStatus = "Sprawdzanie"
+    @Published private(set) var backgroundTaskRunning = false
+    @Published private(set) var lastBackgroundRun: Date?
 
     private var client: TrainCoreClient?
 
     private init() {
         settings = AlertStore.loadSettings()
         history = AlertStore.loadHistory()
+        lastBackgroundRun = UserDefaults.standard.object(forKey: "alerts.lastBackgroundRun") as? Date
     }
 
 
@@ -57,6 +62,7 @@ final class AlertService: ObservableObject {
             save()
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskId)
             addEvent(.info, "Alert wyłączony")
+            await refreshBackgroundState()
             return
         }
         guard let target else {
@@ -74,6 +80,7 @@ final class AlertService: ObservableObject {
         save()
         addEvent(.info, "Alert włączony: \(target.label), \(target.route), \(target.day)")
         scheduleBackgroundRefresh()
+        await refreshBackgroundState()
         _ = await runCheck(source: "start")
     }
 
@@ -238,11 +245,12 @@ final class AlertService: ObservableObject {
         private let lock = NSLock()
         private var completed = false
         init(_ t: BGTask) { task = t }
-        func complete(_ ok: Bool) {
+        func complete(_ ok: Bool) -> Bool {
             lock.lock(); defer { lock.unlock() }
-            guard !completed else { return }
+            guard !completed else { return false }
             completed = true
             task.setTaskCompleted(success: ok)
+            return true
         }
     }
 
@@ -278,6 +286,26 @@ final class AlertService: ObservableObject {
         }
     }
 
+    func refreshBackgroundState() async {
+        switch UIApplication.shared.backgroundRefreshStatus {
+        case .available: backgroundRefreshAvailability = "Dostępne"
+        case .denied: backgroundRefreshAvailability = "Wyłączone"
+        case .restricted: backgroundRefreshAvailability = "Ograniczone przez system"
+        @unknown default: backgroundRefreshAvailability = "Nieznane"
+        }
+
+        let requests = await BGTaskScheduler.shared.pendingTaskRequests()
+        if let request = requests.first(where: { $0.identifier == Self.taskId }) {
+            if let date = request.earliestBeginDate {
+                backgroundRequestStatus = "Najwcześniej \(date.formatted(date: .abbreviated, time: .shortened))"
+            } else {
+                backgroundRequestStatus = "Oczekuje"
+            }
+        } else {
+            backgroundRequestStatus = "Brak zaplanowanego zadania"
+        }
+    }
+
     func backgroundDiagnostics() async -> String {
         let info = Bundle.main.infoDictionary ?? [:]
         let ids = (info["BGTaskSchedulerPermittedIdentifiers"] as? [String]) ?? []
@@ -308,14 +336,20 @@ final class AlertService: ObservableObject {
     }
 
     func handleBackground(_ box: TaskBox) {
+        let started = Date()
+        lastBackgroundRun = started
+        UserDefaults.standard.set(started, forKey: "alerts.lastBackgroundRun")
+        backgroundTaskRunning = true
         scheduleBackgroundRefresh()
         let work = Task { @MainActor in
             let ok = await self.runCheck(source: "tło", timeout: 24)
-            box.complete(ok)
+            if box.complete(ok) { self.backgroundTaskRunning = false }
         }
         box.task.expirationHandler = {
             work.cancel()
-            box.complete(false)
+            if box.complete(false) {
+                Task { @MainActor in AlertService.shared.backgroundTaskRunning = false }
+            }
         }
     }
 
@@ -324,7 +358,10 @@ final class AlertService: ObservableObject {
         case .background:
             scheduleBackgroundRefresh()
         case .active:
-            Task { await refreshPermission() }
+            Task {
+                await refreshPermission()
+                await refreshBackgroundState()
+            }
         default:
             break
         }
