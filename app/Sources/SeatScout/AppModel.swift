@@ -6,7 +6,7 @@ import UIKit
 @MainActor
 final class AppModel: ObservableObject {
     @Published var selectedTab: AppTab = .live
-    @Published var remainingSeconds: Int = 16892
+    @Published var remainingSeconds: Int = 0
     @Published var selectedDiscountIndex: Int = 1 { didSet { savePrefs() } }
     @Published var selectedTrainIndex: Int = 0
     @Published var toastMessage: String?
@@ -98,47 +98,7 @@ final class AppModel: ObservableObject {
     private var departureDate: Date?
     private var detailsToken = 0
 
-    @Published var trains: [TrainInfo] = [
-        TrainInfo(
-            id: "4510",
-            number: "IC 4510",
-            name: "Heweliusz",
-            fromStation: "Bielsko-Biała Gł.",
-            departureTime: "05:48",
-            toStation: "Poznań Gł.",
-            arrivalTime: "10:29",
-            duration: "4h 41min",
-            basePrice: 75.00,
-            wagonNumber: 14,
-            freeSeatsCount: 28
-        ),
-        TrainInfo(
-            id: "1410",
-            number: "IC 1410",
-            name: "Klimczok",
-            fromStation: "Katowice",
-            departureTime: "06:12",
-            toStation: "Warszawa Wsch.",
-            arrivalTime: "09:34",
-            duration: "3h 22min",
-            basePrice: 68.00,
-            wagonNumber: 14,
-            freeSeatsCount: 19
-        ),
-        TrainInfo(
-            id: "38100",
-            number: "TLK 38100",
-            name: "Lubomirski",
-            fromStation: "Kraków Gł.",
-            departureTime: "06:15",
-            toStation: "Kołobrzeg",
-            arrivalTime: "16:42",
-            duration: "10h 27min",
-            basePrice: 90.00,
-            wagonNumber: 14,
-            freeSeatsCount: 34
-        )
-    ]
+    @Published var trains: [TrainInfo] = []
 
     let discounts: [DiscountOption] = [
         DiscountOption(name: "37% Szkoła", discountPercent: 37, badgeText: "Ulga 37% (uczniowska)"),
@@ -146,14 +106,7 @@ final class AppModel: ObservableObject {
         DiscountOption(name: "Normalny", discountPercent: 0, badgeText: "Bilet normalny 100%")
     ]
 
-    @Published var segmentsData: [SegmentItem] = [
-        SegmentItem(from: "Bielsko-Biała Gł.", to: "Katowice", depTime: "05:48", arrTime: "06:42", freeSeats: 48, occupancyPercent: 32),
-        SegmentItem(from: "Katowice", to: "Sosnowiec Gł.", depTime: "06:45", arrTime: "06:58", freeSeats: 42, occupancyPercent: 41),
-        SegmentItem(from: "Sosnowiec Gł.", to: "Zawiercie", depTime: "07:00", arrTime: "07:22", freeSeats: 39, occupancyPercent: 45),
-        SegmentItem(from: "Zawiercie", to: "Częstochowa", depTime: "07:24", arrTime: "07:54", freeSeats: 31, occupancyPercent: 57),
-        SegmentItem(from: "Częstochowa", to: "Kalisz", depTime: "07:56", arrTime: "09:12", freeSeats: 24, occupancyPercent: 67),
-        SegmentItem(from: "Kalisz", to: "Poznań Gł.", depTime: "09:14", arrTime: "10:29", freeSeats: 18, occupancyPercent: 75)
-    ]
+    @Published var segmentsData: [SegmentItem] = []
 
     @Published private(set) var detailWagons: [CoreWagon] = []
     @Published var mySeat: MySeat?
@@ -164,7 +117,11 @@ final class AppModel: ObservableObject {
     }
 
     var currentTrain: TrainInfo {
-        trains[min(selectedTrainIndex, trains.count - 1)]
+        guard trains.indices.contains(selectedTrainIndex) else {
+            return TrainInfo(id: "", number: "", name: "", fromStation: "", departureTime: "", toStation: "",
+                             arrivalTime: "", duration: "", basePrice: 0, wagonNumber: 0, freeSeatsCount: 0)
+        }
+        return trains[selectedTrainIndex]
     }
 
     var currentDiscount: DiscountOption {
@@ -191,12 +148,13 @@ final class AppModel: ObservableObject {
         updateTrip()
         if let departureDate {
             remainingSeconds = max(0, Int(departureDate.timeIntervalSinceNow))
-        } else if remainingSeconds > 0 {
-            remainingSeconds -= 1
+        } else {
+            remainingSeconds = 0
         }
     }
 
     func selectTrain(_ index: Int) {
+        if selectedTrainIndex != index { detailWagons = [] }
         selectedTrainIndex = index
         triggerHaptic()
         showToast("Wybrano: \(trains[index].number) \(trains[index].name)")
@@ -368,6 +326,7 @@ final class AppModel: ObservableObject {
                 showToast("Brak bezpośrednich połączeń \(from.name) → \(to.name)")
                 return false
             }
+            detailWagons = []
             coreTrains = Dictionary(found.map { (String($0.number), $0) }, uniquingKeysWith: { a, _ in a })
             trains = found.map { Self.trainInfo($0, from: from, to: to, price: 0, wagon: 0, free: 0) }
             selectedTrainIndex = 0

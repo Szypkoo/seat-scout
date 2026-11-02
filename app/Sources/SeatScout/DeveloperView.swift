@@ -28,7 +28,7 @@ struct DeveloperView: View {
             List {
                 Section("Stan") {
                     LabeledContent("Rdzeń Seat Scout", value: TrainCoreClient.version)
-                    LabeledContent("Dane", value: model.isLive ? "na żywo" : "demo")
+                    LabeledContent("Dane", value: model.isLive ? "na żywo" : "brak danych")
                     LabeledContent("Słownik stacji", value: model.dictionary.map { "\($0.count) stacji" } ?? "brak")
                     LabeledContent("Pociąg", value: "\(model.currentTrain.number) \(model.currentTrain.name)")
                     LabeledContent("Cena bazowa", value: model.currentTrain.basePrice > 0 ? model.priceString(model.currentTrain.basePrice) : "brak")

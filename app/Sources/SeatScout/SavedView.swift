@@ -16,7 +16,7 @@ struct SavedView: View {
             List {
                 alertSection
                 if alerts.settings.enabled { optionsSection }
-                testSection
+                permissionSection
                 historySection
             }
             .listStyle(.insetGrouped)
@@ -84,17 +84,8 @@ struct SavedView: View {
         }
     }
 
-    private var testSection: some View {
+    private var permissionSection: some View {
         Section {
-            Button("Powiadomienie testowe za 1 minutę") {
-                Task { await alerts.scheduleTestNotification() }
-            }
-            if let at = alerts.testAt, at > Date() {
-                Label("Zaplanowano na \(at.formatted(date: .omitted, time: .standard)) – możesz zamknąć aplikację",
-                      systemImage: "bell.badge")
-                    .font(.footnote)
-                    .foregroundStyle(.green)
-            }
             LabeledContent("Zgoda na powiadomienia") {
                 Text(permissionText).foregroundStyle(permissionColor)
             }
@@ -104,7 +95,7 @@ struct SavedView: View {
                 }
             }
         } header: {
-            Text("Test")
+            Text("Powiadomienia")
         }
     }
 
