@@ -41,11 +41,11 @@ struct SegmentsView: View {
                 }
 
                 if let plan = model.balancedPlan {
-                    let separate = model.planPeople == 2 && !model.planTogether
+                    let separate = model.planPeople > 2 || (model.planPeople == 2 && !model.planTogether)
                     let together = model.planPeople == 2 && model.planTogether
                     planSection(separate ? "Osoba 1" : (together ? "Najlepszy plan (razem)" : "Najlepszy plan"), plan: plan)
-                    if let second = model.secondPersonPlan {
-                        planSection("Osoba 2", plan: second)
+                    ForEach(Array(model.additionalPlans.enumerated()), id: \.offset) { index, personPlan in
+                        planSection("Osoba \(index + 2)", plan: personPlan)
                     }
                     if let single = model.singleSeatPlan, single.seatedMinutes != plan.seatedMinutes {
                         planSection(together ? "Bez zmiany miejsc (razem)" : "Bez zmiany miejsca", plan: single)
@@ -180,10 +180,11 @@ struct SegmentsView: View {
     private var travelersSection: some View {
         Section {
             Picker("Podróżni", selection: Binding(get: { model.planPeople }, set: { model.setPlanPeople($0) })) {
-                Text("1 osoba").tag(1)
-                Text("2 osoby").tag(2)
+                ForEach(1...6, id: \.self) { count in
+                    Text(count == 1 ? "1 osoba" : (count < 5 ? "\(count) osoby" : "\(count) osób")).tag(count)
+                }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             if model.planPeople == 2 {
                 Toggle("Siedzimy obok siebie", isOn: Binding(get: { model.planTogether }, set: { model.setPlanTogether($0) }))
             }
@@ -191,7 +192,9 @@ struct SegmentsView: View {
             if model.planPeople == 2 {
                 Text(model.planTogether
                      ? "Szukamy par sąsiednich foteli (obok siebie lub naprzeciw) wolnych na tych samych odcinkach i przesiadamy się razem."
-                     : "Każda osoba dostaje własny plan; drugi plan nie używa foteli pierwszego.")
+                     : "Każda osoba dostaje własny plan bez powtarzania miejsc na tym samym odcinku.")
+            } else if model.planPeople > 2 {
+                Text("Każda osoba dostaje własny plan bez powtarzania miejsc na tym samym odcinku. Miejsca nie muszą być obok siebie.")
             }
         }
     }
@@ -289,8 +292,10 @@ private struct WagonMatrixSection: View {
 
     private var planned: Set<[Int]> {
         var out = Set<[Int]>()
-        for r in model.balancedPlan?.runs ?? [] where r.seat != nil {
-            for leg in r.fromStop..<r.toStop { out.insert([r.wagon, leg]) }
+        for plan in [model.balancedPlan].compactMap({ $0 }) + model.additionalPlans {
+            for r in plan.runs where r.seat != nil {
+                for leg in r.fromStop..<r.toStop { out.insert([r.wagon, leg]) }
+            }
         }
         return out
     }

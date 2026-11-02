@@ -260,6 +260,9 @@ TcPlan *tc_planner_solve(const TcPlanner *p, size_t board_stop, size_t alight_st
 TcPlan *tc_planner_solve_pairs(const TcPlanner *p, size_t board_stop, size_t alight_stop,
                                int32_t change_penalty_min);
 
+int tc_planner_solve_many(const TcPlanner *p, size_t board_stop, size_t alight_stop,
+                          int32_t change_penalty_min, size_t people, TcPlan **out);
+
 int tc_planner_solve_separate(const TcPlanner *p, size_t board_stop, size_t alight_stop,
                               int32_t change_penalty_min, TcPlan **out_a, TcPlan **out_b);
 int tc_plan_summary(const TcPlan *plan, TcPlanSummary *out);

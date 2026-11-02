@@ -234,6 +234,14 @@ final class SeatPlanner: @unchecked Sendable {
         return Self.convert(plan)
     }
 
+    func solveMany(board: Int, alight: Int, changePenaltyMinutes: Int, people: Int) -> [SeatPlan]? {
+        var handles = [OpaquePointer?](repeating: nil, count: people)
+        guard tc_planner_solve_many(handle, board, alight, Int32(changePenaltyMinutes), people, &handles) == 0 else { return nil }
+        defer { for handle in handles { if let handle { tc_plan_free(handle) } } }
+        let plans = handles.compactMap { $0.flatMap(Self.convert) }
+        return plans.count == people ? plans : nil
+    }
+
     func solveSeparate(board: Int, alight: Int, changePenaltyMinutes: Int) -> (SeatPlan, SeatPlan)? {
         var pa: OpaquePointer?, pb: OpaquePointer?
         guard tc_planner_solve_separate(handle, board, alight, Int32(changePenaltyMinutes), &pa, &pb) == 0,

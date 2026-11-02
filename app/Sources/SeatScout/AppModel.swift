@@ -26,7 +26,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var planAlight = 0
     @Published private(set) var balancedPlan: SeatPlan?
     @Published private(set) var singleSeatPlan: SeatPlan?
-    @Published private(set) var secondPersonPlan: SeatPlan?
+    @Published private(set) var additionalPlans: [SeatPlan] = []
     @Published private(set) var planPeople = 1
     @Published private(set) var planTogether = true
     @Published private(set) var failedLegs = 0
@@ -54,7 +54,7 @@ final class AppModel: ObservableObject {
         p.prune(now: Date(), timeZone: Self.warsaw)
         prefs = p
         if let d = p.discountIndex, discounts.indices.contains(d) { selectedDiscountIndex = d }
-        if let n = p.planPeople, (1...2).contains(n) { planPeople = n }
+        if let n = p.planPeople, (1...6).contains(n) { planPeople = n }
         if let t = p.planTogether { planTogether = t }
         PrefsStore.save(p)
     }
@@ -98,6 +98,7 @@ final class AppModel: ObservableObject {
     private var coreTrains: [String: CoreTrain] = [:]
     private var departureDate: Date?
     private var detailsToken = 0
+    private var planToken = 0
 
     @Published var trains: [TrainInfo] = []
 
@@ -195,8 +196,8 @@ final class AppModel: ObservableObject {
 
     var plannedSeats: Set<[Int]> {
         var out = Set<[Int]>()
-        for plan in [balancedPlan, secondPersonPlan] {
-            for r in plan?.runs ?? [] {
+        for plan in [balancedPlan].compactMap({ $0 }) + additionalPlans {
+            for r in plan.runs {
                 if let s = r.seat { out.insert([r.wagon, s]) }
                 if let s = r.seat2 { out.insert([r.wagon, s]) }
             }
@@ -558,8 +559,9 @@ final class AppModel: ObservableObject {
         segmentsFor = trainId
 
         if !sameTrain {
+            planToken += 1
             segmentsData = []; planStops = []; planner = nil; legsData = [:]
-            balancedPlan = nil; singleSeatPlan = nil; secondPersonPlan = nil
+            balancedPlan = nil; singleSeatPlan = nil; additionalPlans = []
             failedLegs = 0; planDataAge = nil
         }
         isLoadingSegments = true
@@ -749,8 +751,7 @@ final class AppModel: ObservableObject {
             showToast("Najpierw poczekaj na plan miejsc")
             return
         }
-        var people = [planSteps(plan)]
-        if planPeople == 2, !planTogether, let second = secondPersonPlan { people.append(planSteps(second)) }
+        let people = ([plan] + additionalPlans).map(planSteps)
         let committed = CommittedPlan(trainKey: key, label: "\(currentTrain.number) \(currentTrain.name)", people: people)
         let t = reminderTimes()
         if await ReminderService.shared.commit(committed, arr: t.arr, dep: t.dep) {
@@ -817,7 +818,7 @@ final class AppModel: ObservableObject {
     }
 
     func setPlanPeople(_ n: Int) {
-        planPeople = n
+        planPeople = min(max(n, 1), 6)
         savePrefs()
         recomputePlans()
     }
@@ -829,32 +830,43 @@ final class AppModel: ObservableObject {
     }
 
     private func recomputePlans() {
+        planToken += 1
+        let token = planToken
         guard let planner, planAlight > planBoard else {
             balancedPlan = nil
             singleSeatPlan = nil
-            secondPersonPlan = nil
+            additionalPlans = []
             return
         }
         let (b, a, people, together) = (planBoard, planAlight, planPeople, planTogether)
+        balancedPlan = nil
+        singleSeatPlan = nil
+        additionalPlans = []
         Task {
-            struct Result: Sendable { var main: SeatPlan?; var single: SeatPlan?; var second: SeatPlan? }
+            struct Result: Sendable { var main: SeatPlan?; var single: SeatPlan?; var others: [SeatPlan] = [] }
             let r: Result = await Task.detached {
                 if people == 1 {
                     return Result(main: planner.solve(board: b, alight: a, changePenaltyMinutes: 10),
                                   single: planner.solve(board: b, alight: a, changePenaltyMinutes: 100_000))
-                } else if together {
+                }
+                if people == 2 && together {
                     return Result(main: planner.solvePairs(board: b, alight: a, changePenaltyMinutes: 10),
                                   single: planner.solvePairs(board: b, alight: a, changePenaltyMinutes: 100_000))
-                } else if let (p1, p2) = planner.solveSeparate(board: b, alight: a, changePenaltyMinutes: 10) {
-                    return Result(main: p1, single: nil, second: p2)
                 }
-                return Result()
+                guard let plans = planner.solveMany(board: b, alight: a, changePenaltyMinutes: 10, people: people) else { return Result() }
+                return Result(main: plans.first, others: Array(plans.dropFirst()))
             }.value
-            guard b == planBoard, a == planAlight, people == planPeople, together == planTogether else { return }
+            guard token == planToken, b == planBoard, a == planAlight, people == planPeople, together == planTogether else { return }
             balancedPlan = r.main
             singleSeatPlan = r.single
-            secondPersonPlan = r.second
-            log(.info, "plan", "plan (\(people) os.\(people == 2 ? (together ? ", razem" : ", osobno") : "")): siedzenie \(r.main?.seatedPercent ?? -1)%\(r.second.map { " / \($0.seatedPercent)%" } ?? ""), przesiadki \(r.main?.changes ?? -1), miejsca na całą trasę \(r.main?.fullRideSeats ?? -1)")
+            additionalPlans = r.others
+            if remindersActive, let plan = r.main, let key = seatKey {
+                let steps = ([plan] + r.others).map(planSteps)
+                let committed = CommittedPlan(trainKey: key, label: "\(currentTrain.number) \(currentTrain.name)", people: steps)
+                let times = reminderTimes()
+                _ = await ReminderService.shared.commit(committed, arr: times.arr, dep: times.dep)
+            }
+            log(.info, "plan", "plan dla \(people) osób: \(r.main == nil ? 0 : 1 + r.others.count) planów miejsc")
         }
     }
 
