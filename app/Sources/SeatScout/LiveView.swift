@@ -2,14 +2,11 @@ import SwiftUI
 
 struct LiveView: View {
     @EnvironmentObject private var model: AppModel
-    @ObservedObject private var island = LiveActivityService.shared
 
     var body: some View {
         NavigationStack {
             List {
                 TripSection()
-
-                islandSection
 
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
@@ -110,7 +107,7 @@ struct LiveView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("IC Miejsca")
+            .navigationTitle("Seat Scout")
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .top) { TrainPickerBar() }
             .toolbar {
@@ -121,24 +118,6 @@ struct LiveView: View {
                         .foregroundStyle(.green)
                 }
             }
-        }
-    }
-
-    private var islandSection: some View {
-        Section {
-            Toggle(isOn: Binding(get: { island.isRunning }, set: { on in Task { await model.setLiveActivity(on) } })) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Dynamic Island / ekran blokady").font(.subheadline.weight(.semibold))
-                    Text("Pozycja pociągu, opóźnienie, odliczanie i zmiana fotela zawsze na wierzchu")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .disabled(!island.isAvailable && !island.isRunning)
-            if let reason = island.unavailableReason, !island.isRunning {
-                Label(reason, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange)
-            }
-        } footer: {
-            Text("Odliczanie liczy system sam, a pozycja i opóźnienie odświeżają się, gdy aplikacja działa (co 45 s). Po zamknięciu aplikacji dane mogą być nieaktualne.")
         }
     }
 }

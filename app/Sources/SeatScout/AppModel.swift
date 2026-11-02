@@ -1,4 +1,3 @@
-import SeatScoutShared
 import SwiftUI
 #if canImport(UIKit)
 import UIKit
@@ -785,52 +784,6 @@ final class AppModel: ObservableObject {
         if let old = trip, old.state == t.state, old.minutesToNext == t.minutesToNext, old.delay == t.delay, old.isActual == t.isActual,
            old.stops.map(\.arr) == t.stops.map(\.arr) { return }
         trip = t
-        updateLiveActivity()
-    }
-
-    func activityState() -> TrainActivityAttributes.ContentState? {
-        guard let t = trip, !tripStops.isEmpty, t.stops.count == tripStops.count else { return nil }
-        let warsaw = Self.warsaw
-        func date(_ m: Int64) -> Date { ReminderPlanner.date(fromLocalMinutes: m, timeZone: warsaw) }
-        let phase: String, headline: String, stop: String, when: Date?
-        switch t.state {
-        case .notStarted:
-            phase = "before"; stop = tripStops[0].name; headline = "Odjazd z \(stop)"; when = date(t.stops[0].dep)
-        case .atStation(let i):
-            phase = "station"; stop = tripStops[i].name; headline = "Stoi: \(stop)"; when = date(t.stops[i].dep)
-        case .between(_, let b):
-            phase = "moving"; stop = tripStops[b].name; headline = "Jedzie do \(stop)"; when = date(t.stops[b].arr)
-        case .finished:
-            phase = "finished"; stop = tripStops[tripStops.count - 1].name; headline = "Dojechał: \(stop)"; when = nil
-        }
-        let next = ReminderService.shared.scheduled.first { $0.fireDate > Date() }
-        let seat = mySeat.map { "wagon \($0.wagon) · miejsce \($0.number)" }
-        let change = next.flatMap { r -> String? in
-            guard r.id.hasPrefix("seat-1-") else { return nil }
-            return r.title.replacingOccurrences(of: #"^Za \d+ min "#, with: "", options: .regularExpression) + ": " + r.body.replacingOccurrences(of: "\n", with: " · ")
-        }
-        return TrainActivityAttributes.ContentState(
-            phase: phase, headline: headline, nextStop: stop, nextDate: when, delayMinutes: t.delay,
-            seatText: seat, changeText: change, changeDate: change != nil ? next?.fireDate : nil, progress: t.progress)
-    }
-
-    func updateLiveActivity() {
-        guard LiveActivityService.shared.isRunning, let s = activityState() else { return }
-        LiveActivityService.shared.update(s)
-    }
-
-    func setLiveActivity(_ on: Bool) async {
-        if !on {
-            await LiveActivityService.shared.end()
-            return
-        }
-        if trip == nil { await refreshTrip() }
-        guard let s = activityState(), let target = currentWatchTarget() else {
-            showToast("Poczekaj, aż pojawi się pozycja pociągu")
-            return
-        }
-        LiveActivityService.shared.start(label: target.label, route: target.route, state: s)
-        if let err = LiveActivityService.shared.lastError { showToast(err) }
     }
 
     func trackingLoop() async {

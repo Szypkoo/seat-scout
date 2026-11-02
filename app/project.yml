@@ -9,30 +9,6 @@ settings:
     INFOPLIST_KEY_CFBundleVersion: '1'
     INFOPLIST_KEY_CFBundleShortVersionString: '1.0'
 targets:
-  SeatScoutShared:
-    type: library.static
-    platform: iOS
-    sources: [Sources/SeatScoutShared]
-    settings:
-      base:
-        PRODUCT_MODULE_NAME: SeatScoutShared
-        DEFINES_MODULE: 'YES'
-  SeatScoutWidget:
-    type: app-extension
-    platform: iOS
-    sources: [Sources/SeatScoutWidget]
-    info:
-      path: Support/SeatScoutWidget-Info.plist
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.seatscout.widget
-        GENERATE_INFOPLIST_FILE: 'NO'
-        SKIP_INSTALL: 'YES'
-    dependencies:
-      - target: SeatScoutShared
   SeatScout:
     type: application
     platform: iOS
@@ -42,7 +18,6 @@ targets:
       properties:
         CFBundleDisplayName: Seat Scout
         UILaunchScreen: {}
-        NSSupportsLiveActivities: true
         BGTaskSchedulerPermittedIdentifiers: [com.example.seatscout.refresh]
         UIBackgroundModes: [fetch]
     settings:
@@ -52,7 +27,3 @@ targets:
         SWIFT_INCLUDE_PATHS: '$(SRCROOT)/Sources/CSeatScout/include'
         LIBRARY_SEARCH_PATHS: '$(SRCROOT)/../core/dist/ios'
         OTHER_LDFLAGS: ['$(inherited)', '-lseat_scout_core']
-    dependencies:
-      - target: SeatScoutShared
-      - target: SeatScoutWidget
-        embed: true
