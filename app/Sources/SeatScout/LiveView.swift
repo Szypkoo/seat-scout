@@ -24,18 +24,19 @@ struct LiveView: View {
                                 Text("Twoja podróż")
                                     .font(.subheadline.weight(.semibold))
                                 Spacer()
-                                Text(model.mySeat.map { "Wagon \($0.wagon) • M. \($0.number)" } ?? "Wybierz fotel w zakładce Fotele")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(.blue, in: Capsule())
+                                if let seat = model.mySeat {
+                                    Text("Wagon \(seat.wagon) • M. \(seat.number)")
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(.blue, in: Capsule())
+                                }
                             }
 
                             Text("Odjazd z \(model.currentTrain.fromStation) o \(model.currentTrain.departureTime)")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-
 
                             if model.hasDepartureTime {
                                 Text(model.formattedCountdown)
