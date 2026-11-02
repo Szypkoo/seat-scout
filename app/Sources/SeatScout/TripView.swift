@@ -60,7 +60,7 @@ struct TripSection: View {
             Text("Gdzie jest pociąg")
         } footer: {
             if let trip = model.trip {
-                Text((trip.isActual ? "Ostatnie zgłoszenie Intercity; dalsze godziny są szacowane" : "Pozycja szacowana na podstawie rozkładu")
+                Text((trip.isActual ? "Szacunkowo na podstawie godzin Intercity" : "Szacunkowo na podstawie rozkładu")
                      + (model.tripUpdated.map { " · zaktualizowano \($0.formatted(date: .omitted, time: .standard))" } ?? ""))
             }
         }
@@ -72,9 +72,9 @@ struct TripSection: View {
     private func title(_ t: TripInfo) -> String {
         switch t.state {
         case .notStarted: return "Przed odjazdem"
-        case .atStation(let i): return t.isActual ? "Ostatni zgłoszony przyjazd: \(name(i))" : "Według rozkładu: \(name(i))"
-        case .between(let a, _): return t.isActual ? "Ostatni zgłoszony odjazd: \(name(a))" : "Według rozkładu: po odjeździe z \(name(a))"
-        case .finished: return t.isActual ? "Zgłoszono przyjazd do \(name(model.tripStops.count - 1))" : "Według rozkładu: po przyjeździe"
+        case .atStation(let i): return "Szacowana stacja: \(name(i))"
+        case .between(let a, _): return "Szacunkowo po odjeździe z \(name(a))"
+        case .finished: return "Szacunkowo po przyjeździe do \(name(model.tripStops.count - 1))"
         }
     }
 
@@ -117,7 +117,7 @@ struct TripSection: View {
     @ViewBuilder
     private func delayBadge(_ t: TripInfo) -> some View {
         if let d = t.delay {
-            Text(d > 0 ? "+\(d) min" : (d == 0 ? "o czasie" : "\(d) min"))
+            Text(d > 0 ? "wg Intercity +\(d) min" : (d == 0 ? "wg Intercity o czasie" : "wg Intercity \(d) min"))
                 .font(.footnote.weight(.bold))
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background((d > 0 ? Color.orange : Color.green).opacity(0.2), in: Capsule())
