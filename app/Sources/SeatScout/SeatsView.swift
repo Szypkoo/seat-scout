@@ -247,7 +247,8 @@ private struct WagonMapView: View {
     private let cell: CGFloat = 40
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        let toiletBlocks = mergedToiletBlocks
+        return ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color(.tertiarySystemFill).opacity(0.5))
                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.5))
@@ -261,7 +262,17 @@ private struct WagonMapView: View {
                     .allowsHitTesting(false)
             }
 
-            ForEach(decor) { d in decorView(d) }
+            ForEach(toiletBlocks) { block in
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(width: block.bounds.height * scale - 4, height: block.bounds.width * scale - 4)
+                    .position(x: block.bounds.midY * scale, y: block.bounds.midX * scale)
+            }
+            ForEach(decor) { item in
+                if !toiletBlocks.contains(where: { $0.members.contains(item.id) }) {
+                    decorView(item)
+                }
+            }
             ForEach(wagon.seats) { s in
                 if let xy = s.xy { seatView(s, xy: xy) }
             }
@@ -278,6 +289,29 @@ private struct WagonMapView: View {
             }
         }
         .frame(width: CGFloat(height) * scale, height: CGFloat(width) * scale)
+    }
+
+    private struct ToiletBlock: Identifiable {
+        let id: String
+        let bounds: CGRect
+        let members: Set<String>
+    }
+
+    private var mergedToiletBlocks: [ToiletBlock] {
+        decor.filter { $0.isSign && ($0.code == "401" || $0.title.localizedCaseInsensitiveContains("toalet")) }
+            .compactMap { toilet in
+                let toiletBounds = CGRect(x: toilet.x, y: toilet.y, width: toilet.w, height: toilet.h)
+                let pieces = decor.filter { item in
+                    guard !item.isSign else { return false }
+                    let bounds = CGRect(x: item.x, y: item.y, width: item.w, height: item.h)
+                    return bounds.intersects(toiletBounds)
+                }
+                guard pieces.count > 1 else { return nil }
+                let bounds = pieces.reduce(CGRect.null) { result, item in
+                    result.union(CGRect(x: item.x, y: item.y, width: item.w, height: item.h))
+                }
+                return ToiletBlock(id: toilet.id, bounds: bounds, members: Set(pieces.map(\.id)))
+            }
     }
 
     private func compartmentBounds(_ group: CompartmentLayout.Group) -> CGRect {
