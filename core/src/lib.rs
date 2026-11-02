@@ -1,6 +1,7 @@
 pub mod api;
 pub mod dates;
 pub mod error;
+pub mod ffi;
 pub mod model;
 pub mod planner;
 pub mod stations;

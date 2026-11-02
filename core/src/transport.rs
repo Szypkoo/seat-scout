@@ -5,6 +5,10 @@ thread_local! {
     static LAST_HTTP_STATUS: Cell<i32> = const { Cell::new(0) };
 }
 
+pub(crate) fn set_last_http_status(status: i32) {
+    LAST_HTTP_STATUS.with(|last| last.set(status));
+}
+
 pub fn last_http_status() -> i32 {
     LAST_HTTP_STATUS.with(Cell::get)
 }
@@ -26,7 +30,7 @@ pub(crate) fn fetch_text(
     body: Option<&str>,
 ) -> Result<String> {
     let resp = t.request(method, url, body)?;
-    LAST_HTTP_STATUS.with(|status| status.set(resp.status));
+    set_last_http_status(resp.status);
     if resp.status == 403 || resp.status == 429 {
         return Err(Error::Blocked(resp.status));
     }
