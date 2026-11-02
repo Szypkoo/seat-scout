@@ -167,16 +167,24 @@ struct SeatsView: View {
         }
     }
 
-    private func mapSection(_ w: CoreWagon) -> some View {
-        let lay = layout(for: w)
+    private func mapSection(_ wagon: CoreWagon) -> some View {
+        let wagonLayout = layout(for: wagon)
+        let compartments = CompartmentLayout(seats: wagon.seats)
         return Section {
-            VStack(spacing: 6) {
+            VStack(spacing: 10) {
                 Text("początek wagonu").font(.caption2).foregroundStyle(.secondary)
                 WagonMapView(
-                    wagon: w, width: lay.width, height: lay.height, decor: lay.decor,
+                    wagon: wagon, width: wagonLayout.width, height: wagonLayout.height,
+                    decor: wagonLayout.decor, compartments: compartments,
                     selected: selected, planned: model.plannedSeats, mine: model.mySeat,
                     onSelect: { selected = $0 == selected ? nil : $0 })
                 Text("koniec wagonu").font(.caption2).foregroundStyle(.secondary)
+
+                if compartments != nil {
+                    Text("Podział orientacyjny według numerów i położenia miejsc. Sprawdź układ u przewoźnika.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
@@ -229,6 +237,7 @@ private struct WagonMapView: View {
     let width: Int
     let height: Int
     let decor: [CoreDecor]
+    let compartments: CompartmentLayout?
     let selected: Int?
     let planned: Set<[Int]>
     let mine: AppModel.MySeat?
@@ -243,12 +252,45 @@ private struct WagonMapView: View {
                 .fill(Color(.tertiarySystemFill).opacity(0.5))
                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.5))
 
+            ForEach(compartments?.groups ?? []) { group in
+                let bounds = compartmentBounds(group)
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.secondary.opacity(0.7), lineWidth: 2)
+                    .frame(width: bounds.width - 2, height: bounds.height - 2)
+                    .position(x: bounds.midX, y: bounds.midY)
+                    .allowsHitTesting(false)
+            }
+
             ForEach(decor) { d in decorView(d) }
             ForEach(wagon.seats) { s in
                 if let xy = s.xy { seatView(s, xy: xy) }
             }
+
+            ForEach(compartments?.groups ?? []) { group in
+                let bounds = compartmentBounds(group)
+                Text("Przedział \(group.id)")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 5)
+                    .background(.regularMaterial, in: Capsule())
+                    .position(x: bounds.midX, y: bounds.midY)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(width: CGFloat(height) * scale, height: CGFloat(width) * scale)
+    }
+
+    private func compartmentBounds(_ group: CompartmentLayout.Group) -> CGRect {
+        let positions = group.rows.flatMap { $0 }.compactMap(\.xy)
+        let minX = positions.map(\.x).min() ?? 0
+        let maxX = positions.map(\.x).max() ?? minX
+        let minY = positions.map(\.y).min() ?? 0
+        let maxY = positions.map(\.y).max() ?? minY
+        return CGRect(
+            x: CGFloat(minY) * scale, y: CGFloat(minX) * scale,
+            width: (CGFloat(maxY - minY) + cell) * scale,
+            height: (CGFloat(maxX - minX) + cell) * scale
+        )
     }
 
     private func center(x: Int, y: Int, w: Int, h: Int) -> CGPoint {

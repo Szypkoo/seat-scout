@@ -16,7 +16,6 @@ struct SavedView: View {
             List {
                 alertSection
                 if alerts.settings.enabled { optionsSection }
-                backgroundSection
                 testSection
                 historySection
             }
@@ -24,10 +23,7 @@ struct SavedView: View {
             .navigationTitle("Śledzone")
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .top) { TrainPickerBar() }
-            .task {
-                await alerts.refreshPermission()
-                await alerts.refreshBackgroundState()
-            }
+            .task { await alerts.refreshPermission() }
         }
     }
 
@@ -85,25 +81,6 @@ struct SavedView: View {
                 }
             }
             .disabled(alerts.isChecking)
-        }
-    }
-
-    private var backgroundSection: some View {
-        Section {
-            LabeledContent("Odświeżanie w iOS", value: alerts.backgroundRefreshAvailability)
-            LabeledContent("Zadanie", value: alerts.backgroundTaskRunning ? "W trakcie" : alerts.backgroundRequestStatus)
-            if let lastRun = alerts.lastBackgroundRun {
-                LabeledContent("Ostatnie uruchomienie", value: lastRun.formatted(date: .abbreviated, time: .shortened))
-            } else {
-                LabeledContent("Ostatnie uruchomienie", value: "Jeszcze nie odnotowano")
-            }
-            Button("Sprawdź status") {
-                Task { await alerts.refreshBackgroundState() }
-            }
-        } header: {
-            Text("Działanie w tle")
-        } footer: {
-            Text("iOS decyduje, kiedy uruchomić zadanie. Zaplanowanie nie oznacza, że zadanie już działa.")
         }
     }
 
