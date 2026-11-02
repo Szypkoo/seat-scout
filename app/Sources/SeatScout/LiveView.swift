@@ -21,7 +21,7 @@ struct LiveView: View {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
-                                Text("Śledzenie fotela w podróży")
+                                Text("Twoja podróż")
                                     .font(.subheadline.weight(.semibold))
                                 Spacer()
                                 Text(model.mySeat.map { "Wagon \($0.wagon) • M. \($0.number)" } ?? "Wybierz fotel w zakładce Fotele")
@@ -32,6 +32,11 @@ struct LiveView: View {
                                     .background(.blue, in: Capsule())
                             }
 
+                            Text("Odjazd z \(model.currentTrain.fromStation) o \(model.currentTrain.departureTime)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+
                             if model.hasDepartureTime {
                                 Text(model.formattedCountdown)
                                     .font(.system(.largeTitle, design: .rounded).monospacedDigit().weight(.bold))
@@ -40,10 +45,6 @@ struct LiveView: View {
                             } else if model.isLoadingDetails {
                                 LoadingBar(width: 165, height: 36)
                             }
-
-                            Text("Odjazd \(model.currentTrain.fromStation) o \(model.currentTrain.departureTime)")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
 
                             let total = model.detailWagons.flatMap(\.seats).filter { !$0.isSpecial }.count
                             if total > 0 {
