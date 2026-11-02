@@ -516,7 +516,7 @@ final class AppModel: ObservableObject {
         let best = wagons.max { free($0) < free($1) }
         trains[idx] = Self.trainInfo(core, from: from, to: to, price: prices[0] ?? trains[idx].basePrice,
                                      wagon: best?.wagon ?? 0, free: wagons.map(free).reduce(0, +))
-        if let best {
+        if best != nil {
             detailWagons = wagons
         }
     }

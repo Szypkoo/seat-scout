@@ -168,7 +168,7 @@ final class CoreRoute: @unchecked Sendable {
 func coreCompactTime(_ text: String) -> String? {
     var buf = [CChar](repeating: 0, count: 16)
     guard tc_time_compact(text, &buf, buf.count) == 0 else { return nil }
-    return String(cString: buf)
+    return String(decoding: buf.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
 }
 
 func coreHHMM(_ text: String) -> String {

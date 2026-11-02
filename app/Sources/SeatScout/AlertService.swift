@@ -271,6 +271,8 @@ final class AlertService: ObservableObject {
             return "za dużo oczekujących zadań"
         case .notPermitted:
             return "iOS nie pozwala tej instalacji planować zadań w tle (brak identyfikatora w zainstalowanym Info.plist albo ograniczenie podpisu)"
+        case .immediateRunIneligible:
+            return e.localizedDescription
         @unknown default:
             return e.localizedDescription
         }
