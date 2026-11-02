@@ -1,0 +1,58 @@
+name: SeatScout
+options:
+  deploymentTarget:
+    iOS: '18.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    CODE_SIGNING_ALLOWED: 'NO'
+    INFOPLIST_KEY_CFBundleVersion: '1'
+    INFOPLIST_KEY_CFBundleShortVersionString: '1.0'
+targets:
+  SeatScoutShared:
+    type: library.static
+    platform: iOS
+    sources: [Sources/SeatScoutShared]
+    settings:
+      base:
+        PRODUCT_MODULE_NAME: SeatScoutShared
+        DEFINES_MODULE: 'YES'
+  SeatScoutWidget:
+    type: app-extension
+    platform: iOS
+    sources: [Sources/SeatScoutWidget]
+    info:
+      path: Support/SeatScoutWidget-Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.seatscout.widget
+        GENERATE_INFOPLIST_FILE: 'NO'
+        SKIP_INSTALL: 'YES'
+    dependencies:
+      - target: SeatScoutShared
+  SeatScout:
+    type: application
+    platform: iOS
+    sources: [Sources/SeatScout]
+    info:
+      path: Support/SeatScout-Info.plist
+      properties:
+        CFBundleDisplayName: Seat Scout
+        UILaunchScreen: {}
+        NSSupportsLiveActivities: true
+        BGTaskSchedulerPermittedIdentifiers: [com.example.seatscout.refresh]
+        UIBackgroundModes: [fetch]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.seatscout
+        GENERATE_INFOPLIST_FILE: 'NO'
+        SWIFT_INCLUDE_PATHS: '$(SRCROOT)/Sources/CSeatScout/include'
+        LIBRARY_SEARCH_PATHS: '$(SRCROOT)/../core/dist/ios'
+        OTHER_LDFLAGS: ['$(inherited)', '-lseat_scout_core']
+    dependencies:
+      - target: SeatScoutShared
+      - target: SeatScoutWidget
+        embed: true
