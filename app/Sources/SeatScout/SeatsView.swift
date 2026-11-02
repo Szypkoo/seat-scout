@@ -173,7 +173,7 @@ struct SeatsView: View {
         return Section {
             VStack(spacing: 10) {
                 if wagon.direction == 1 || wagon.direction == -1 {
-                    Label("Kierunek jazdy", systemImage: wagon.direction == 1 ? "arrow.up" : "arrow.down")
+                    Label("Kierunek jazdy (orientacyjnie)", systemImage: wagon.direction == 1 ? "arrow.up" : "arrow.down")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
@@ -210,7 +210,8 @@ struct SeatsView: View {
     private func directionArrow(_ wagon: CoreWagon) -> some View {
         if wagon.direction == 1 || wagon.direction == -1 {
             Image(systemName: wagon.direction == 1 ? "arrow.up" : "arrow.down")
-                .font(.headline)
+                .font(.system(size: 28, weight: .bold))
+                .frame(width: 28)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
         }
