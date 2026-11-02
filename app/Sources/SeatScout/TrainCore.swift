@@ -49,6 +49,7 @@ struct CoreWagon: Identifiable, Sendable {
     var width: Int = 0
     var height: Int = 0
     var decor: [CoreDecor] = []
+    var direction: Int = 0
     var id: String { "\(wagon)-\(travelClass)" }
 }
 
@@ -377,7 +378,7 @@ final class TrainCoreClient: @unchecked Sendable {
             return CoreWagon(
                 wagon: Int(w.wagon), travelClass: Int(w.klasa),
                 freeCount: Int(w.free_count), occupiedCount: Int(w.occupied_count), seats: seats,
-                width: Int(w.width), height: Int(w.height), decor: decor)
+                width: Int(w.width), height: Int(w.height), decor: decor, direction: Int(tc_report_direction(report)))
         }
     }
 

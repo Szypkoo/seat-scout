@@ -172,6 +172,11 @@ struct SeatsView: View {
         let compartments = CompartmentLayout(seats: wagon.seats)
         return Section {
             VStack(spacing: 10) {
+                if wagon.direction != 0 {
+                    Label("Kierunek jazdy", systemImage: wagon.direction == 1 ? "arrow.up" : "arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text("początek wagonu").font(.caption2).foregroundStyle(.secondary)
                 WagonMapView(
                     wagon: wagon, width: wagonLayout.width, height: wagonLayout.height,

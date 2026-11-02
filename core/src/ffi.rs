@@ -216,6 +216,7 @@ struct WagonRow {
 pub struct TcSeatReport {
     rows: Vec<WagonRow>,
     warnings: Vec<CString>,
+    direction: i32,
 }
 
 impl TcSeatReport {
@@ -276,6 +277,7 @@ impl TcSeatReport {
         Box::new(TcSeatReport {
             rows,
             warnings: Vec::new(),
+            direction: 0,
         })
     }
 }
@@ -338,8 +340,14 @@ pub unsafe extern "C" fn tc_seats_for_segment(
         let res = api::seats_for_segment_ex(&tr, &q)?;
         let mut report = TcSeatReport::new(res.rows);
         report.warnings = res.warnings.iter().map(|w| cs(w)).collect();
+        report.direction = res.direction;
         Ok(report)
     })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tc_report_direction(r: *const TcSeatReport) -> i32 {
+    r.as_ref().map_or(0, |r| r.direction)
 }
 
 #[no_mangle]
