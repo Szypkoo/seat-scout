@@ -43,7 +43,7 @@ public struct ContentView: View {
         .onReceive(timer) { _ in model.tick() }
         .task { await model.loadLive() }
         .task { await AlertService.shared.foregroundLoop() }
-        .task(id: model.currentTrain.id) { await model.trackingLoop() }
+        .task(id: model.trackingKey) { await model.trackingLoop() }
         .sheet(isPresented: $model.showSearch) {
             SearchView().environmentObject(model)
         }

@@ -696,6 +696,11 @@ final class AppModel: ObservableObject {
     }
 
 
+    var trackingKey: String {
+        let train = coreTrains[currentTrain.id]
+        return "\(currentTrain.id)-\(train?.departure ?? "")-\(fromStation?.eva ?? 0)-\(toStation?.eva ?? 0)"
+    }
+
     nonisolated private static func nowMinutes() -> Int64? {
         coreCompactMinutes(format("yyyyMMddHHmm").string(from: Date()))
     }
@@ -703,11 +708,11 @@ final class AppModel: ObservableObject {
     @discardableResult
     func refreshTrip() async -> Bool {
         guard let client, let from = fromStation, let to = toStation, let core = coreTrains[currentTrain.id] else { return false }
-        let id = currentTrain.id
+        let key = trackingKey
         do {
             let t0 = Date()
             let route = try await Task.detached { try client.routeHandle(train: core, from: from, to: to) }.value
-            guard id == currentTrain.id else { return false }
+            guard !Task.isCancelled, key == trackingKey else { return false }
             tripRoute = route
             tripStops = route.stops
             tripUpdated = Date()
@@ -723,6 +728,7 @@ final class AppModel: ObservableObject {
                 + (trip.map { ", opóźnienie: \($0.delay.map { "\($0) min" } ?? "brak danych")" } ?? ""))
             return true
         } catch {
+            guard !Task.isCancelled, key == trackingKey else { return false }
             tripError = Self.describe(error)
             log(.warn, "trip", "śledzenie: \(Self.describe(error))")
             return false
@@ -787,9 +793,14 @@ final class AppModel: ObservableObject {
     }
 
     func trackingLoop() async {
+        tripRoute = nil
+        trip = nil
+        tripStops = []
+        tripUpdated = nil
+        tripError = nil
         while !Task.isCancelled {
             let ok = await refreshTrip()
-            var wait: Duration = ok ? .seconds(300) : .seconds(3)
+            var wait: Duration = ok ? .seconds(300) : .seconds(30)
             if ok, let t = trip, let first = t.stops.first, let last = t.stops.last, let now = Self.nowMinutes(),
                now >= first.schedDep - 90, now <= last.arr + 20 {
                 wait = .seconds(45)

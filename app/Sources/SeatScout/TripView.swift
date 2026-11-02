@@ -20,9 +20,20 @@ struct TripSection: View {
                         Spacer()
                         delayBadge(trip)
                     }
-                    ProgressView(value: trip.progress).tint(.blue)
+                    if !trip.isActual {
+                        ProgressView(value: trip.progress).tint(.blue)
+                        Text("Szacowany postęp według rozkładu")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.vertical, 4)
+
+                if let err = model.tripError {
+                    Label("Nie udało się odświeżyć danych: \(err)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
 
                 if let note = currentMessages(trip) {
                     Label(note, systemImage: "exclamationmark.bubble.fill")
@@ -49,7 +60,7 @@ struct TripSection: View {
             Text("Gdzie jest pociąg")
         } footer: {
             if let trip = model.trip {
-                Text((trip.isActual ? "Rzeczywiste godziny z Intercity" : "Wg rozkładu – Intercity jeszcze nie podaje rzeczywistych godzin")
+                Text((trip.isActual ? "Ostatnie zgłoszenie Intercity; dalsze godziny są szacowane" : "Pozycja szacowana na podstawie rozkładu")
                      + (model.tripUpdated.map { " · zaktualizowano \($0.formatted(date: .omitted, time: .standard))" } ?? ""))
             }
         }
@@ -61,9 +72,9 @@ struct TripSection: View {
     private func title(_ t: TripInfo) -> String {
         switch t.state {
         case .notStarted: return "Przed odjazdem"
-        case .atStation(let i): return "Stoi na stacji \(name(i))"
-        case .between(let a, _): return "Odjechał z \(name(a))"
-        case .finished: return "Dojechał do \(name(model.tripStops.count - 1))"
+        case .atStation(let i): return t.isActual ? "Ostatni zgłoszony przyjazd: \(name(i))" : "Według rozkładu: \(name(i))"
+        case .between(let a, _): return t.isActual ? "Ostatni zgłoszony odjazd: \(name(a))" : "Według rozkładu: po odjeździe z \(name(a))"
+        case .finished: return t.isActual ? "Zgłoszono przyjazd do \(name(model.tripStops.count - 1))" : "Według rozkładu: po przyjeździe"
         }
     }
 
@@ -74,7 +85,7 @@ struct TripSection: View {
         case .atStation(let i):
             return i == model.tripStops.count - 1 ? nil : "Odjazd o \(coreClock(t.stops[i].dep))"
         case .between(_, let b):
-            return "Jedzie do \(name(b)) · przyjazd \(coreClock(t.stops[b].arr))\(t.minutesToNext > 0 ? " (za \(minutes(t.minutesToNext)))" : "")"
+            return "Następna stacja: \(name(b)) · przyjazd \(coreClock(t.stops[b].arr))\(t.minutesToNext > 0 ? " (za \(minutes(t.minutesToNext)))" : "")"
         case .finished:
             return nil
         }
@@ -111,6 +122,11 @@ struct TripSection: View {
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background((d > 0 ? Color.orange : Color.green).opacity(0.2), in: Capsule())
                 .foregroundStyle(d > 0 ? .orange : .green)
+        } else {
+            Text("Brak danych o opóźnieniu")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 
