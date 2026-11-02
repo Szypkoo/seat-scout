@@ -290,7 +290,7 @@ private struct WagonMapView: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(Color.secondary.opacity(0.12))
                     .frame(width: block.bounds.height * scale - 4, height: block.bounds.width * scale - 4)
-                    .position(x: block.bounds.midY * scale, y: block.bounds.midX * scale)
+                    .position(x: (CGFloat(height) - block.bounds.midY) * scale, y: block.bounds.midX * scale)
             }
             ForEach(decor) { item in
                 if !toiletBlocks.contains(where: { $0.members.contains(item.id) }) {
@@ -345,14 +345,14 @@ private struct WagonMapView: View {
         let minY = positions.map(\.y).min() ?? 0
         let maxY = positions.map(\.y).max() ?? minY
         return CGRect(
-            x: CGFloat(minY) * scale, y: CGFloat(minX) * scale,
+            x: (CGFloat(height - maxY) - cell) * scale, y: CGFloat(minX) * scale,
             width: (CGFloat(maxY - minY) + cell) * scale,
             height: (CGFloat(maxX - minX) + cell) * scale
         )
     }
 
     private func center(x: Int, y: Int, w: Int, h: Int) -> CGPoint {
-        CGPoint(x: (CGFloat(y) + CGFloat(h) / 2) * scale, y: (CGFloat(x) + CGFloat(w) / 2) * scale)
+        CGPoint(x: (CGFloat(height) - CGFloat(y) - CGFloat(h) / 2) * scale, y: (CGFloat(x) + CGFloat(w) / 2) * scale)
     }
 
     @ViewBuilder
@@ -405,7 +405,7 @@ private struct WagonMapView: View {
                         .foregroundStyle(isSel ? .white : (usable ? .primary : .secondary))
                 }
                 if s.position == .window {
-                    let leftEdge = CGFloat(xy.y) + cell / 2 < CGFloat(height) / 2
+                    let leftEdge = CGFloat(xy.y) + cell / 2 > CGFloat(height) / 2
                     Capsule().fill(Color.cyan.opacity(usable ? 0.95 : 0.4))
                         .frame(width: 3, height: side * 0.55)
                         .frame(maxWidth: .infinity, alignment: leftEdge ? .leading : .trailing)
