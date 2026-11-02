@@ -291,6 +291,7 @@ pub fn parse_sklad(v: &Value) -> Option<Sklad> {
             v.get("kierunekJazdy").and_then(as_i64),
             v.get("zmieniaKierunek").and_then(Value::as_bool),
         ) {
+            (_, Some(true)) => 2,
             (Some(direction @ (-1 | 1)), Some(false)) => direction as i32,
             _ => 0,
         },

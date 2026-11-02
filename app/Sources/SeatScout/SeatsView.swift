@@ -172,17 +172,25 @@ struct SeatsView: View {
         let compartments = CompartmentLayout(seats: wagon.seats)
         return Section {
             VStack(spacing: 10) {
-                if wagon.direction != 0 {
+                if wagon.direction == 1 || wagon.direction == -1 {
                     Label("Kierunek jazdy", systemImage: wagon.direction == 1 ? "arrow.up" : "arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(wagon.direction == 2 ? "Pociąg zmienia kierunek na trasie" : "Brak danych o kierunku jazdy")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Text("początek wagonu").font(.caption2).foregroundStyle(.secondary)
-                WagonMapView(
-                    wagon: wagon, width: wagonLayout.width, height: wagonLayout.height,
-                    decor: wagonLayout.decor, compartments: compartments,
-                    selected: selected, planned: model.plannedSeats, mine: model.mySeat,
-                    onSelect: { selected = $0 == selected ? nil : $0 })
+                HStack(alignment: .center, spacing: 8) {
+                    directionArrow(wagon)
+                    WagonMapView(
+                        wagon: wagon, width: wagonLayout.width, height: wagonLayout.height,
+                        decor: wagonLayout.decor, compartments: compartments,
+                        selected: selected, planned: model.plannedSeats, mine: model.mySeat,
+                        onSelect: { selected = $0 == selected ? nil : $0 })
+                    directionArrow(wagon)
+                }
                 Text("koniec wagonu").font(.caption2).foregroundStyle(.secondary)
 
                 if compartments != nil {
@@ -195,6 +203,16 @@ struct SeatsView: View {
             .padding(.vertical, 6)
         } header: {
             Text("Mapa wagonu")
+        }
+    }
+
+    @ViewBuilder
+    private func directionArrow(_ wagon: CoreWagon) -> some View {
+        if wagon.direction == 1 || wagon.direction == -1 {
+            Image(systemName: wagon.direction == 1 ? "arrow.up" : "arrow.down")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         }
     }
 

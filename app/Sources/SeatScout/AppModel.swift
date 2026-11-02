@@ -421,7 +421,7 @@ final class AppModel: ObservableObject {
             applyDetails(core: core, from: from, to: to, wagons: c.wagons.map(\.core), prices: prices, note: c.priceNote)
             let age = Int(Date().timeIntervalSince(c.savedAt))
             log(.info, "app", "szczegóły z dysku (sprzed \(age) s)")
-            if age < 120 { return }
+            if age < 120 && c.wagons.allSatisfy({ $0.direction != nil }) { return }
         } else {
             ticketPrices = [:]
             priceNote = nil
@@ -599,7 +599,7 @@ final class AppModel: ObservableObject {
             applyPlanData(stops: stops, legs: legs, from: from, to: to, resetRange: true)
             planDataAge = snap.savedAt
             log(.info, "plan", "z dysku: \(legs.count) odcinków sprzed \(Int(Date().timeIntervalSince(snap.savedAt))) s")
-            if Date().timeIntervalSince(snap.savedAt) < 240 {
+            if Date().timeIntervalSince(snap.savedAt) < 240 && snap.legs.values.flatMap({ $0 }).allSatisfy({ $0.direction != nil }) {
                 isLoadingSegments = false
                 segmentsProgress = ""
                 return
