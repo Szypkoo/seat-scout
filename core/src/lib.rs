@@ -1,3 +1,4 @@
+pub mod api;
 pub mod dates;
 pub mod error;
 pub mod model;
