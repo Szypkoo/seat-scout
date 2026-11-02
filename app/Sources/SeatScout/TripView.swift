@@ -7,19 +7,16 @@ struct TripSection: View {
         Section {
             if let trip = model.trip, !model.tripStops.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(title(trip)).font(.headline)
-                            if let sub = subtitle(trip) {
-                                Text(sub).font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            if let detail = detail(trip) {
-                                Text(detail).font(.footnote).foregroundStyle(.secondary)
-                            }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title(trip)).font(.headline)
+                        if let sub = subtitle(trip) {
+                            Text(sub).font(.subheadline).foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        delayBadge(trip)
+                        if let detail = detail(trip) {
+                            Text(detail).font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
+                    delayBadge(trip)
                     if !trip.isActual {
                         ProgressView(value: trip.progress).tint(.blue)
                         Text("Szacowany postęp według rozkładu")
@@ -101,8 +98,15 @@ struct TripSection: View {
         }
         guard let i = idx else { return nil }
         let s = model.tripStops[i]
-        let parts = [s.platform.isEmpty ? nil : "peron \(s.platform)", s.track.isEmpty ? nil : "tor \(s.track)"].compactMap { $0 }
-        return parts.isEmpty ? nil : "\(name(i)): " + parts.joined(separator: ", ")
+        let loc = location(s)
+        return loc.isEmpty ? nil : "\(name(i)): " + loc
+    }
+
+    private func location(_ stop: CoreStop) -> String {
+        let platform = stop.platform.replacingOccurrences(of: "\\n", with: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let track = stop.track.replacingOccurrences(of: "\\n", with: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return [platform.isEmpty ? nil : "peron\u{00a0}\(platform)", track.isEmpty ? nil : "tor\u{00a0}\(track)"]
+            .compactMap { $0 }.joined(separator: ", ")
     }
 
     private func currentMessages(_ t: TripInfo) -> String? {
@@ -157,9 +161,9 @@ struct TripSection: View {
                 Text(s.name)
                     .font(.subheadline.weight(st == .current || st == .next ? .bold : .regular))
                     .foregroundStyle(st == .passed ? .secondary : .primary)
-                let loc = [s.platform.isEmpty ? nil : "peron \(s.platform)", s.track.isEmpty ? nil : "tor \(s.track)"].compactMap { $0 }
+                let loc = location(s)
                 if !loc.isEmpty {
-                    Text(loc.joined(separator: ", ")).font(.caption2).foregroundStyle(.secondary)
+                    Text(loc).font(.caption2).foregroundStyle(.secondary)
                 }
                 if !s.messages.isEmpty {
                     Text(s.messages).font(.caption2).foregroundStyle(.orange)
