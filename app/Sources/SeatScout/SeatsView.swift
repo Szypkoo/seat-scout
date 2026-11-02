@@ -50,85 +50,80 @@ struct SeatsView: View {
 
 
     var body: some View {
-        NavigationStack {
-            List {
-                sourceSection
-                if sourceWagons.isEmpty {
-                    if model.isLoadingDetails || model.isLoadingSegments {
-                        Section {
-                            HStack(spacing: 8) {
-                                ForEach(0..<4, id: \.self) { _ in
-                                    LoadingBar(width: 56, height: 48)
-                                }
+        List {
+            sourceSection
+            if sourceWagons.isEmpty {
+                if model.isLoadingDetails || model.isLoadingSegments {
+                    Section {
+                        HStack(spacing: 8) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                LoadingBar(width: 56, height: 48)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    } header: {
+                        Text("Wagon")
+                    }
+                    Section {
+                        ForEach(0..<2, id: \.self) { _ in
+                            HStack {
+                                LoadingBar(width: 125)
+                                Spacer()
+                                LoadingBar(width: 55)
                             }
                             .padding(.vertical, 2)
-                        } header: {
-                            Text("Wagon")
                         }
-                        Section {
-                            ForEach(0..<2, id: \.self) { _ in
-                                HStack {
-                                    LoadingBar(width: 125)
-                                    Spacer()
-                                    LoadingBar(width: 55)
-                                }
-                                .padding(.vertical, 2)
-                            }
-                        }
-                        Section {
-                            VStack(spacing: 12) {
-                                ForEach(0..<4, id: \.self) { _ in
-                                    HStack(spacing: 8) {
-                                        LoadingBar(width: 36, height: 36)
-                                        LoadingBar(width: 36, height: 36)
-                                        Spacer(minLength: 20)
-                                        LoadingBar(width: 36, height: 36)
-                                        LoadingBar(width: 36, height: 36)
-                                    }
+                    }
+                    Section {
+                        VStack(spacing: 12) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                HStack(spacing: 8) {
+                                    LoadingBar(width: 36, height: 36)
+                                    LoadingBar(width: 36, height: 36)
+                                    Spacer(minLength: 20)
+                                    LoadingBar(width: 36, height: 36)
+                                    LoadingBar(width: 36, height: 36)
                                 }
                             }
-                            .padding(16)
-                            .frame(maxWidth: 250)
-                            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.secondary.opacity(0.2)))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Pobieram miejsca w wagonach")
-                        } header: {
-                            Text("Mapa wagonu")
                         }
-                    } else {
-                        Section {
-                            Text(model.isLive ? "Brak danych o miejscach" : "Wybierz połączenie, aby zobaczyć miejsca")
-                                .foregroundStyle(.secondary)
-                        }
+                        .padding(16)
+                        .frame(maxWidth: 250)
+                        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.secondary.opacity(0.2)))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Pobieram miejsca w wagonach")
+                    } header: {
+                        Text("Mapa wagonu")
                     }
                 } else {
-                    wagonChips
-                    if let w = currentWagon {
-                        summarySection(w)
-                        mapSection(w)
-                        legendSection
+                    Section {
+                        Text(model.isLive ? "Brak danych o miejscach" : "Wybierz połączenie, aby zobaczyć miejsca")
+                            .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Fotele")
-            .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .top) { TrainPickerBar() }
-            .safeAreaInset(edge: .bottom) {
-                if let w = currentWagon, let n = selected, let seat = w.seats.first(where: { $0.number == n }) {
-                    SeatDetailPanel(wagon: w, seat: seat, onClose: { selected = nil })
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                wagonChips
+                if let w = currentWagon {
+                    summarySection(w)
+                    mapSection(w)
+                    legendSection
                 }
             }
-            .animation(.snappy, value: selected)
-            .task { await model.loadSegments() }
-            .onChange(of: model.currentTrain.id) { _, _ in
-                legChoice = nil; wagonChoice = nil; selected = nil
+        }
+        .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom) {
+            if let w = currentWagon, let n = selected, let seat = w.seats.first(where: { $0.number == n }) {
+                SeatDetailPanel(wagon: w, seat: seat, onClose: { selected = nil })
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        }
+        .animation(.snappy, value: selected)
+        .task { await model.loadSegments() }
+        .onChange(of: model.currentTrain.id) { _, _ in
+            legChoice = nil; wagonChoice = nil; selected = nil
         }
     }
 

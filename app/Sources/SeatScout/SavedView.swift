@@ -12,19 +12,14 @@ struct SavedView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                alertSection
-                if alerts.settings.enabled { optionsSection }
-                permissionSection
-                historySection
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Śledzone")
-            .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .top) { TrainPickerBar() }
-            .task { await alerts.refreshPermission() }
+        List {
+            alertSection
+            if alerts.settings.enabled { optionsSection }
+            permissionSection
+            historySection
         }
+        .listStyle(.insetGrouped)
+        .task { await alerts.refreshPermission() }
     }
 
 
