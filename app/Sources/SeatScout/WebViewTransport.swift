@@ -1,4 +1,5 @@
 import Foundation
+#if !SKIP
 import WebKit
 
 @MainActor
@@ -151,6 +152,45 @@ final class WebSession: NSObject, WKNavigationDelegate {
         }
     }
 }
+#else
+@MainActor
+final class WebSession: NSObject {
+    private var ready = false
+    private var nextSlot = ContinuousClock.now
+
+    override init() {
+        super.init()
+    }
+
+    func start() async throws {
+        ready = true
+    }
+
+    nonisolated static func ms(_ d: Duration) -> Int {
+        Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
+    }
+
+    nonisolated static func shortURL(_ url: String) -> String {
+        url.replacingOccurrences(of: "https://api-gateway.intercity.pl", with: "")
+    }
+
+    func fetch(method: String, url: String, body: String?) async -> (status: Int32, body: Data)? {
+        let t0 = ContinuousClock.now
+        let name = "\(method) \(Self.shortURL(url))"
+        let web = com.example.seatscout.AndroidWebSession(com.example.seatscout.MainActivity.instance.applicationContext)
+        guard let pair = await web.executeFetch(method: method, url: url, body: body) else {
+            log(.error, "net", "\(name) – błąd sieci / timeout Android")
+            return nil
+        }
+        let status = Int32(pair.first)
+        let data = Data(pair.second)
+        let took = Self.ms(ContinuousClock.now - t0)
+        let ok = (200..<300).contains(status)
+        log(ok ? .debug : .warn, "net", "\(name) → \(status) (\(data.count / 1024) KB, \(took) ms)")
+        return (status, data)
+    }
+}
+#endif
 
 final class WebViewTransport: HTTPTransport, @unchecked Sendable {
     private let session: WebSession

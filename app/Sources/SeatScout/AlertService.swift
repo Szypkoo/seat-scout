@@ -1,6 +1,17 @@
+#if canImport(BackgroundTasks)
 import BackgroundTasks
+#endif
 import SwiftUI
+#if canImport(UserNotifications)
 import UserNotifications
+#else
+enum UNAuthorizationStatus: Int, Sendable {
+    case notDetermined = 0, denied = 1, authorized = 2, provisional = 3, ephemeral = 4
+}
+#endif
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @MainActor
 final class AlertService: ObservableObject {
@@ -25,7 +36,9 @@ final class AlertService: ObservableObject {
     private init() {
         settings = AlertStore.loadSettings()
         history = AlertStore.loadHistory()
+        #if canImport(UserNotifications)
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["test-alert"])
+        #endif
     }
 
 
@@ -90,15 +103,24 @@ final class AlertService: ObservableObject {
 
 
     func refreshPermission() async {
+        #if canImport(UserNotifications)
         permission = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        #else
+        permission = .authorized
+        #endif
     }
 
     @discardableResult
     func requestPermission() async -> Bool {
+        #if canImport(UserNotifications)
         let center = UNUserNotificationCenter.current()
         let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
         await refreshPermission()
         return granted || permission == .authorized || permission == .provisional
+        #else
+        permission = .authorized
+        return true
+        #endif
     }
 
 
@@ -108,7 +130,9 @@ final class AlertService: ObservableObject {
         if AlertEngine.isExpired(target, now: Date(), timeZone: Self.warsaw) {
             settings.enabled = false
             save()
+            #if canImport(BackgroundTasks)
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskId)
+            #endif
             addEvent(.info, "Pociąg \(target.label) już dojechał – alert wyłączony")
             return true
         }
@@ -199,6 +223,7 @@ final class AlertService: ObservableObject {
 
 
     private func notify(title: String, body: String) async {
+        #if canImport(UserNotifications)
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -209,15 +234,21 @@ final class AlertService: ObservableObject {
         } catch {
             addEvent(.error, "Nie udało się dodać powiadomienia: \(error.localizedDescription)")
         }
+        #else
+        log(.info, "alert", "\(title): \(body)")
+        #endif
     }
 
     nonisolated static func registerBackgroundTask() {
+        #if canImport(BackgroundTasks)
         BGTaskScheduler.shared.register(forTaskWithIdentifier: taskId, using: nil) { task in
             let box = TaskBox(task)
             Task { @MainActor in AlertService.shared.handleBackground(box) }
         }
+        #endif
     }
 
+    #if canImport(BackgroundTasks)
     final class TaskBox: @unchecked Sendable {
         let task: BGTask
         private let lock = NSLock()
@@ -230,8 +261,14 @@ final class AlertService: ObservableObject {
             task.setTaskCompleted(success: ok)
         }
     }
+    #else
+    final class TaskBox: @unchecked Sendable {
+        func complete(_ ok: Bool) {}
+    }
+    #endif
 
     func scheduleBackgroundRefresh() {
+        #if canImport(BackgroundTasks)
         guard settings.enabled else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.taskId)
         request.earliestBeginDate = Date(timeIntervalSinceNow: Self.interval)
@@ -245,9 +282,13 @@ final class AlertService: ObservableObject {
             log(.warn, "alert", "nie udało się zaplanować zadania w tle: \(why) [\((error as NSError).domain) \((error as NSError).code)]")
             logBackgroundDiagnostics()
         }
+        #else
+        backgroundStatus = "aktywne w tle"
+        #endif
     }
 
     private static func describeBackgroundError(_ error: Error) -> String {
+        #if canImport(BackgroundTasks)
         guard let e = error as? BGTaskScheduler.Error else { return error.localizedDescription }
         switch e.code {
         case .unavailable:
@@ -261,6 +302,9 @@ final class AlertService: ObservableObject {
         @unknown default:
             return e.localizedDescription
         }
+        #else
+        return error.localizedDescription
+        #endif
     }
 
     func backgroundDiagnostics() async -> String {
@@ -268,13 +312,21 @@ final class AlertService: ObservableObject {
         let ids = (info["BGTaskSchedulerPermittedIdentifiers"] as? [String]) ?? []
         let modes = (info["UIBackgroundModes"] as? [String]) ?? []
         let status: String
+        #if canImport(UIKit)
         switch UIApplication.shared.backgroundRefreshStatus {
         case .available: status = "dostępne"
         case .denied: status = "WYŁĄCZONE przez użytkownika"
         case .restricted: status = "ograniczone systemowo"
         @unknown default: status = "?"
         }
+        #else
+        status = "dostępne (Android)"
+        #endif
+        #if canImport(BackgroundTasks)
         let pending = await BGTaskScheduler.shared.pendingTaskRequests().map { "\($0.identifier) od \($0.earliestBeginDate?.formatted(date: .omitted, time: .shortened) ?? "?")" }
+        #else
+        let pending: [String] = []
+        #endif
         return """
         bundle: \(Bundle.main.bundleIdentifier ?? "?")
         BGTaskSchedulerPermittedIdentifiers: \(ids.isEmpty ? "BRAK" : ids.joined(separator: ", ")) (używany: \(Self.taskId))
@@ -298,10 +350,12 @@ final class AlertService: ObservableObject {
             let ok = await self.runCheck(source: "tło", timeout: 24)
             box.complete(ok)
         }
+        #if canImport(BackgroundTasks)
         box.task.expirationHandler = {
             work.cancel()
             box.complete(false)
         }
+        #endif
     }
 
     func scenePhaseChanged(_ phase: ScenePhase) {
@@ -316,6 +370,7 @@ final class AlertService: ObservableObject {
     }
 }
 
+#if canImport(UserNotifications)
 final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     static let shared = NotificationDelegate()
 
@@ -323,3 +378,8 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @u
         [.banner, .list, .sound]
     }
 }
+#else
+final class NotificationDelegate: NSObject, @unchecked Sendable {
+    static let shared = NotificationDelegate()
+}
+#endif

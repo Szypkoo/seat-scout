@@ -1,5 +1,10 @@
 import SwiftUI
+#if canImport(UserNotifications)
 import UserNotifications
+#endif
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SavedView: View {
     @EnvironmentObject private var model: AppModel
@@ -85,8 +90,10 @@ struct SavedView: View {
                 Text(permissionText).foregroundStyle(permissionColor)
             }
             if alerts.permission == .denied {
-                Button("Otwórz ustawienia iOS") {
+                Button("Otwórz ustawienia") {
+                    #if canImport(UIKit)
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    #endif
                 }
             }
         } header: {

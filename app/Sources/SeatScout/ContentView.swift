@@ -1,5 +1,8 @@
 import Combine
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 public struct ContentView: View {
     @StateObject private var model = AppModel()
@@ -58,7 +61,9 @@ public struct ContentView: View {
                         }
                         if model.selectedTab == .developer {
                             Button {
+                                #if canImport(UIKit)
                                 UIPasteboard.general.string = logs.text
+                                #endif
                                 model.showToast("Skopiowano \(logs.entries.count) wpisów")
                             } label: { Image(systemName: "doc.on.doc") }
                             ShareLink(item: logs.text) { Image(systemName: "square.and.arrow.up") }

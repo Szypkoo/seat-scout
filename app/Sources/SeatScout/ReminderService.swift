@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(UserNotifications)
 import UserNotifications
+#endif
 
 @MainActor
 final class ReminderService: ObservableObject {
@@ -37,9 +39,11 @@ final class ReminderService: ObservableObject {
     }
 
     private func removePending() async {
+        #if canImport(UserNotifications)
         let center = UNUserNotificationCenter.current()
         let ids = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(Self.idPrefix) }
         center.removePendingNotificationRequests(withIdentifiers: ids)
+        #endif
     }
 
     func reschedule(arr: [UInt32: Int64], dep: [UInt32: Int64]) async {
@@ -57,6 +61,7 @@ final class ReminderService: ObservableObject {
         signature = sig
 
         await removePending()
+        #if canImport(UserNotifications)
         let center = UNUserNotificationCenter.current()
         for r in list {
             let content = UNMutableNotificationContent()
@@ -71,6 +76,7 @@ final class ReminderService: ObservableObject {
                 log(.error, "remind", "nie udało się zaplanować \(r.id): \(error.localizedDescription)")
             }
         }
+        #endif
         log(.info, "remind", "zaplanowano \(list.count): " + list.map { "\($0.fireDate.formatted(date: .omitted, time: .shortened)) \($0.title)" }.joined(separator: " | "))
     }
 }
