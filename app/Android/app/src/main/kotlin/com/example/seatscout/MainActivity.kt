@@ -3,9 +3,13 @@ package com.example.seatscout
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
 class MainActivity : ComponentActivity() {
@@ -27,21 +31,19 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // Skip transpiles ContentView into a Compose function:
-                    // ContentView().Compose(Modifier.fillMaxSize())
-                    try {
-                        val contentViewClass = Class.forName("com.example.seatscout.ContentView")
-                        val composeMethod = contentViewClass.methods.firstOrNull { it.name == "Compose" }
-                        if (composeMethod != null) {
-                            val instance = contentViewClass.getDeclaredConstructor().newInstance()
-                            // Invokes Skip's transpiled Compose tree
-                            composeMethod.invoke(instance, androidx.compose.runtime.currentComposer, 0)
-                        }
-                    } catch (e: Exception) {
-                        // Fallback placeholder during initial Gradle indexing
-                    }
+                    AppContent()
                 }
             }
         }
+    }
+}
+
+@Composable
+fun AppContent() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Seat Scout Android")
     }
 }

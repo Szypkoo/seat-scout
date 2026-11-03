@@ -41,8 +41,10 @@ if [ -n "$NDK" ] && [ -d "$NDK" ]; then
         # aarch64-linux-android (arm64-v8a)
         if rustup target list 2>/dev/null | grep -q "aarch64-linux-android (installed)"; then
             echo "Kompilacja dla aarch64-linux-android..."
-            CC_aarch64_linux_android="$TOOLCHAIN/aarch64-linux-android${TARGET_API}-clang" \
+            CLANG_BIN="$TOOLCHAIN/aarch64-linux-android${TARGET_API}-clang"
+            CC_aarch64_linux_android="$CLANG_BIN" \
             AR_aarch64_linux_android="$TOOLCHAIN/llvm-ar" \
+            CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG_BIN" \
             cargo build --release --lib --target aarch64-linux-android
             cp target/aarch64-linux-android/release/libseat_scout_core.so "$OUT_DIR/arm64-v8a/"
         fi
