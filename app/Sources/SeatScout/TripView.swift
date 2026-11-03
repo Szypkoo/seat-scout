@@ -39,7 +39,7 @@ struct TripSection: View {
                 }
 
                 DisclosureGroup("Wszystkie stacje (\(model.tripStops.count))") {
-                    ForEach(model.tripStops.indices, id: \.self) { i in
+                    ForEach(0..<model.tripStops.count, id: \.self) { i in
                         stopRow(i, trip)
                     }
                 }
@@ -57,8 +57,14 @@ struct TripSection: View {
             Text("Gdzie jest pociąg")
         } footer: {
             if let trip = model.trip {
-                Text((trip.isActual ? "Szacunkowo na podstawie godzin Intercity" : "Szacunkowo na podstawie rozkładu")
-                     + (model.tripUpdated.map { " · zaktualizowano \($0.formatted(date: .omitted, time: .standard))" } ?? ""))
+                let updatedStr: String = {
+                    guard let d = model.tripUpdated else { return "" }
+                    let f = DateFormatter()
+                    f.timeStyle = .medium
+                    f.dateStyle = .none
+                    return " · zaktualizowano \(f.string(from: d))"
+                }()
+                Text((trip.isActual ? "Szacunkowo na podstawie godzin Intercity" : "Szacunkowo na podstawie rozkładu") + updatedStr)
             }
         }
     }
@@ -103,8 +109,8 @@ struct TripSection: View {
     }
 
     private func location(_ stop: CoreStop) -> String {
-        let platform = stop.platform.replacingOccurrences(of: "\\n", with: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        let track = stop.track.replacingOccurrences(of: "\\n", with: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let platform = stop.platform.replacingOccurrences(of: "\\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let track = stop.track.replacingOccurrences(of: "\\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         return [platform.isEmpty ? nil : "peron\u{00a0}\(platform)", track.isEmpty ? nil : "tor\u{00a0}\(track)"]
             .compactMap { $0 }.joined(separator: ", ")
     }
@@ -172,10 +178,10 @@ struct TripSection: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
                 Text(coreClock(time))
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(time > sched ? .orange : .primary)
                 if time != sched {
-                    Text(coreClock(sched)).font(.caption2.monospacedDigit()).strikethrough().foregroundStyle(.secondary)
+                    Text(coreClock(sched)).font(.caption2).strikethrough().foregroundStyle(.secondary)
                 }
             }
         }

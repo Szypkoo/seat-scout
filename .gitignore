@@ -9,5 +9,7 @@ app/.derived/
 app/*.xcodeproj/
 *.apk
 app/Android/.gradle/
+app/Android/build/
+app/Android/.kotlin/
 app/Android/app/build/
 app/Android/.idea/

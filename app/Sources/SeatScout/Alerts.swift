@@ -34,16 +34,20 @@ struct AlertSettings: Codable, Equatable {
     var lastCheck: Date?
     var lastFreeCount: Int?
 
+    enum CodingKeys: String, CodingKey {
+        case enabled, windowOnly, pairs, target, lastCheck, lastFreeCount
+    }
+
     init() {}
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
-        windowOnly = try c.decodeIfPresent(Bool.self, forKey: .windowOnly) ?? false
-        pairs = try c.decodeIfPresent(Bool.self, forKey: .pairs) ?? false
-        target = try c.decodeIfPresent(WatchTarget.self, forKey: .target)
-        lastCheck = try c.decodeIfPresent(Date.self, forKey: .lastCheck)
-        lastFreeCount = try c.decodeIfPresent(Int.self, forKey: .lastFreeCount)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: CodingKeys.enabled) ?? false
+        windowOnly = try c.decodeIfPresent(Bool.self, forKey: CodingKeys.windowOnly) ?? false
+        pairs = try c.decodeIfPresent(Bool.self, forKey: CodingKeys.pairs) ?? false
+        target = try c.decodeIfPresent(WatchTarget.self, forKey: CodingKeys.target)
+        lastCheck = try c.decodeIfPresent(Date.self, forKey: CodingKeys.lastCheck)
+        lastFreeCount = try c.decodeIfPresent(Int.self, forKey: CodingKeys.lastFreeCount)
     }
 }
 

@@ -1,4 +1,4 @@
-#if canImport(BackgroundTasks)
+#if !SKIP && canImport(BackgroundTasks)
 import BackgroundTasks
 #endif
 import SwiftUI
@@ -20,7 +20,7 @@ final class AlertService: ObservableObject {
         let ids = Bundle.main.infoDictionary?["BGTaskSchedulerPermittedIdentifiers"] as? [String]
         return ids?.first { $0.hasSuffix(".refresh") } ?? ids?.first ?? "com.example.seatscout.refresh"
     }()
-    static let interval: TimeInterval = 5 * 60
+    static let interval: TimeInterval = 300.0
     private static let warsaw = TimeZone(identifier: "Europe/Warsaw") ?? .current
 
     @Published private(set) var settings: AlertSettings
@@ -68,7 +68,9 @@ final class AlertService: ObservableObject {
         if !on {
             settings.enabled = false
             save()
+            #if !SKIP && canImport(BackgroundTasks)
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskId)
+            #endif
             addEvent(.info, "Alert wyłączony")
             return
         }
@@ -130,8 +132,10 @@ final class AlertService: ObservableObject {
         if AlertEngine.isExpired(target, now: Date(), timeZone: Self.warsaw) {
             settings.enabled = false
             save()
-            #if canImport(BackgroundTasks)
+            #if !SKIP && canImport(BackgroundTasks)
+            #if !SKIP && canImport(BackgroundTasks)
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskId)
+            #endif
             #endif
             addEvent(.info, "Pociąg \(target.label) już dojechał – alert wyłączony")
             return true
@@ -174,8 +178,12 @@ final class AlertService: ObservableObject {
             }
             return true
         } catch {
-            let msg = (error as? CoreError).map { $0.isBlocked ? "Intercity zablokowało zapytanie (HTTP \($0.httpStatus))" : $0.message }
-                ?? error.localizedDescription
+            let msg: String
+            if let ce = error as? CoreError {
+                msg = ce.isBlocked ? "Intercity zablokowało zapytanie (HTTP \(ce.httpStatus))" : ce.message
+            } else {
+                msg = error.localizedDescription
+            }
             addEvent(.error, "Sprawdzenie (\(source)) nieudane: \(msg)")
             return false
         }
@@ -188,9 +196,10 @@ final class AlertService: ObservableObject {
     }
 
     private static func withTimeout<T: Sendable>(_ seconds: Double, _ op: @escaping @Sendable () throws -> T) async throws -> T {
+        #if !SKIP
         return try await withCheckedThrowingContinuation { cont in
             let once = Once()
-            DispatchQueue.global(qos: .userInitiated).async {
+            DispatchQueue.global().async {
                 do {
                     let v = try op()
                     if once.claim() { cont.resume(returning: v) }
@@ -202,6 +211,9 @@ final class AlertService: ObservableObject {
                 if once.claim() { cont.resume(throwing: CoreError(code: -2, message: "przekroczono limit czasu (\(Int(seconds)) s)")) }
             }
         }
+        #else
+        return try op()
+        #endif
     }
 
     func foregroundLoop() async {
@@ -240,7 +252,7 @@ final class AlertService: ObservableObject {
     }
 
     nonisolated static func registerBackgroundTask() {
-        #if canImport(BackgroundTasks)
+        #if !SKIP && canImport(BackgroundTasks)
         BGTaskScheduler.shared.register(forTaskWithIdentifier: taskId, using: nil) { task in
             let box = TaskBox(task)
             Task { @MainActor in AlertService.shared.handleBackground(box) }
@@ -248,7 +260,7 @@ final class AlertService: ObservableObject {
         #endif
     }
 
-    #if canImport(BackgroundTasks)
+    #if !SKIP && canImport(BackgroundTasks)
     final class TaskBox: @unchecked Sendable {
         let task: BGTask
         private let lock = NSLock()
@@ -268,7 +280,7 @@ final class AlertService: ObservableObject {
     #endif
 
     func scheduleBackgroundRefresh() {
-        #if canImport(BackgroundTasks)
+        #if !SKIP && canImport(BackgroundTasks)
         guard settings.enabled else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.taskId)
         request.earliestBeginDate = Date(timeIntervalSinceNow: Self.interval)
@@ -288,7 +300,7 @@ final class AlertService: ObservableObject {
     }
 
     private static func describeBackgroundError(_ error: Error) -> String {
-        #if canImport(BackgroundTasks)
+        #if !SKIP && canImport(BackgroundTasks)
         guard let e = error as? BGTaskScheduler.Error else { return error.localizedDescription }
         switch e.code {
         case .unavailable:
@@ -322,7 +334,7 @@ final class AlertService: ObservableObject {
         #else
         status = "dostępne (Android)"
         #endif
-        #if canImport(BackgroundTasks)
+        #if !SKIP && canImport(BackgroundTasks)
         let pending = await BGTaskScheduler.shared.pendingTaskRequests().map { "\($0.identifier) od \($0.earliestBeginDate?.formatted(date: .omitted, time: .shortened) ?? "?")" }
         #else
         let pending: [String] = []
@@ -350,7 +362,7 @@ final class AlertService: ObservableObject {
             let ok = await self.runCheck(source: "tło", timeout: 24)
             box.complete(ok)
         }
-        #if canImport(BackgroundTasks)
+        #if !SKIP && canImport(BackgroundTasks)
         box.task.expirationHandler = {
             work.cancel()
             box.complete(false)

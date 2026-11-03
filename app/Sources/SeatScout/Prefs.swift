@@ -16,18 +16,22 @@ struct Prefs: Codable, Equatable {
     var planTogether: Bool?
     var seats: [String: SavedSeat] = [:]
 
+    enum CodingKeys: String, CodingKey {
+        case fromEva, toEva, date, trainNumber, discountIndex, planPeople, planTogether, seats
+    }
+
     init() {}
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        fromEva = try c.decodeIfPresent(UInt32.self, forKey: .fromEva)
-        toEva = try c.decodeIfPresent(UInt32.self, forKey: .toEva)
-        date = try c.decodeIfPresent(String.self, forKey: .date)
-        trainNumber = try c.decodeIfPresent(Int64.self, forKey: .trainNumber)
-        discountIndex = try c.decodeIfPresent(Int.self, forKey: .discountIndex)
-        planPeople = try c.decodeIfPresent(Int.self, forKey: .planPeople)
-        planTogether = try c.decodeIfPresent(Bool.self, forKey: .planTogether)
-        seats = try c.decodeIfPresent([String: SavedSeat].self, forKey: .seats) ?? [:]
+        fromEva = try c.decodeIfPresent(UInt32.self, forKey: CodingKeys.fromEva)
+        toEva = try c.decodeIfPresent(UInt32.self, forKey: CodingKeys.toEva)
+        date = try c.decodeIfPresent(String.self, forKey: CodingKeys.date)
+        trainNumber = try c.decodeIfPresent(Int64.self, forKey: CodingKeys.trainNumber)
+        discountIndex = try c.decodeIfPresent(Int.self, forKey: CodingKeys.discountIndex)
+        planPeople = try c.decodeIfPresent(Int.self, forKey: CodingKeys.planPeople)
+        planTogether = try c.decodeIfPresent(Bool.self, forKey: CodingKeys.planTogether)
+        seats = try c.decodeIfPresent([String: SavedSeat].self, forKey: CodingKeys.seats) ?? [:]
     }
 
     static func seatKey(trainNumber: Int64, date: String) -> String { "\(trainNumber)-\(date)" }

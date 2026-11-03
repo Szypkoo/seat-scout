@@ -19,7 +19,7 @@ final class ReminderService: ObservableObject {
 
     func commit(_ plan: CommittedPlan, arr: [UInt32: Int64], dep: [UInt32: Int64]) async -> Bool {
         guard await AlertService.shared.requestPermission() else {
-            log(.error, "remind", "brak zgody na powiadomienia – przypomnienia wyłączone")
+            log(LogLevel.error, "remind", "brak zgody na powiadomienia – przypomnienia wyłączone")
             return false
         }
         self.plan = plan
@@ -35,7 +35,7 @@ final class ReminderService: ObservableObject {
         signature = ""
         ReminderStore.save(nil)
         await removePending()
-        log(.info, "remind", "przypomnienia wyłączone")
+        log(LogLevel.info, "remind", "przypomnienia wyłączone")
     }
 
     private func removePending() async {
@@ -73,10 +73,10 @@ final class ReminderService: ObservableObject {
             do {
                 try await center.add(UNNotificationRequest(identifier: r.id, content: content, trigger: trigger))
             } catch {
-                log(.error, "remind", "nie udało się zaplanować \(r.id): \(error.localizedDescription)")
+                log(LogLevel.error, "remind", "nie udało się zaplanować \(r.id): \(error.localizedDescription)")
             }
         }
         #endif
-        log(.info, "remind", "zaplanowano \(list.count): " + list.map { "\($0.fireDate.formatted(date: .omitted, time: .shortened)) \($0.title)" }.joined(separator: " | "))
+        log(LogLevel.info, "remind", "zaplanowano \(list.count): " + list.map { "\($0.fireDate.formatted(date: .omitted, time: .shortened)) \($0.title)" }.joined(separator: " | "))
     }
 }

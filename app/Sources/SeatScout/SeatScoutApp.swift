@@ -3,15 +3,16 @@ import SwiftUI
 import UserNotifications
 #endif
 
+#if !SKIP
 @main
 struct SeatScoutApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        #if !SKIP && canImport(BackgroundTasks)
+        #if canImport(BackgroundTasks)
         AlertService.registerBackgroundTask()
         #endif
-        #if !SKIP && canImport(UserNotifications)
+        #if canImport(UserNotifications)
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
         #endif
     }
@@ -25,3 +26,4 @@ struct SeatScoutApp: App {
         }
     }
 }
+#endif

@@ -11,6 +11,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import seat.scout.AndroidWebSession
+import seat.scout.ContentView
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -22,8 +24,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         instance = this
 
-        // Preload AndroidWebSession
-        AndroidWebSession(applicationContext).start()
+        AndroidWebSession.sharedContext = applicationContext
+        AndroidWebSession.getShared().start()
 
         setContent {
             MaterialTheme {
@@ -40,10 +42,5 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("Seat Scout Android")
-    }
+    ContentView().Compose()
 }

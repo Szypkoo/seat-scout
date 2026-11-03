@@ -14,35 +14,44 @@ public struct ContentView: View {
     public var body: some View {
         ZStack(alignment: .top) {
             NavigationStack {
-                TabView(selection: $model.selectedTab) {
-                    Tab("Na żywo", systemImage: "bolt.fill", value: AppTab.live) {
-                        LiveView()
+                VStack(spacing: 0) {
+                    #if SKIP
+                    if model.selectedTab != .developer {
+                        TrainPickerBar()
                     }
+                    #endif
+                    TabView(selection: $model.selectedTab) {
+                        Tab("Na żywo", systemImage: "bolt.fill", value: AppTab.live) {
+                            LiveView()
+                        }
 
-                    Tab("Plan miejsc", systemImage: "point.topleft.down.to.point.bottomright.curvepath", value: AppTab.segments) {
-                        SegmentsView()
-                    }
+                        Tab("Plan miejsc", systemImage: "point.topleft.down.to.point.bottomright.curvepath", value: AppTab.segments) {
+                            SegmentsView()
+                        }
 
-                    Tab("Fotele", systemImage: "chair.lounge.fill", value: AppTab.seats) {
-                        SeatsView()
-                    }
-                    .badge(model.currentTrain.freeSeatsCount)
+                        Tab("Fotele", systemImage: "chair.lounge.fill", value: AppTab.seats) {
+                            SeatsView()
+                        }
+                        .badge(model.currentTrain.freeSeatsCount)
 
-                    Tab("Śledzone", systemImage: "bell.fill", value: AppTab.saved) {
-                        SavedView()
-                    }
+                        Tab("Śledzone", systemImage: "bell.fill", value: AppTab.saved) {
+                            SavedView()
+                        }
 
-                    Tab("Developer", systemImage: "terminal.fill", value: AppTab.developer) {
-                        DeveloperView()
+                        Tab("Developer", systemImage: "terminal.fill", value: AppTab.developer) {
+                            DeveloperView()
+                        }
                     }
                 }
                 .navigationTitle(model.selectedTab == .live ? "Seat Scout" : model.selectedTab.title)
                 .navigationBarTitleDisplayMode(.inline)
+                #if !SKIP
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if model.selectedTab != .developer {
                         TrainPickerBar()
                     }
                 }
+                #endif
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if model.selectedTab == .live && model.isLive {

@@ -27,7 +27,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.srcDirs("../../core/dist/android/jniLibs")
+            jniLibs.srcDirs("../../../core/dist/android/jniLibs")
         }
     }
 
@@ -49,16 +49,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
+    }
+
+    base {
+        archivesName.set("SeatScout")
     }
 }
 
 dependencies {
+    implementation(project(":SeatScout"))
+    implementation(project(":SkipUI"))
+    implementation(project(":SkipModel"))
+    implementation(project(":SkipFoundation"))
+    implementation(project(":SkipLib"))
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")

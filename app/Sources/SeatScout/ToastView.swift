@@ -8,7 +8,7 @@ struct ToastView: View {
             .font(.footnote.weight(.semibold))
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(.regularMaterial, in: Capsule())
+            .background(Color.secondary.opacity(0.15), in: Capsule())
             .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
     }
 }

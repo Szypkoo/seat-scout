@@ -43,7 +43,7 @@ struct SearchView: View {
 
                 Section {
                     DatePicker("Data", selection: $model.searchDate, in: Date()...Date().addingTimeInterval(30 * 24 * 3600),
-                               displayedComponents: .date)
+                               displayedComponents: DatePickerComponents.date)
                         .environment(\.locale, Locale(identifier: "pl_PL"))
 
                     Button {
@@ -61,7 +61,7 @@ struct SearchView: View {
 
                 if model.isLive, !model.trains.isEmpty {
                     Section("Połączenia bezpośrednie (\(model.trains.count))") {
-                        ForEach(model.trains.indices, id: \.self) { idx in
+                        ForEach(0..<model.trains.count, id: \.self) { idx in
                             resultRow(model.trains[idx], selected: idx == model.selectedTrainIndex) {
                                 model.pickSearchResult(idx)
                             }
@@ -126,7 +126,7 @@ struct SearchView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(t.departureTime) → \(t.arrivalTime)")
-                        .font(.headline.monospacedDigit())
+                        .font(.headline)
                     Text("\(t.number) \(t.name)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -137,7 +137,9 @@ struct SearchView: View {
                     if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(.blue) }
                 }
             }
+            #if !SKIP
             .contentShape(Rectangle())
+            #endif
         }
         .buttonStyle(.plain)
     }

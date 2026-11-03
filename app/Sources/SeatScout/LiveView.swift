@@ -38,12 +38,18 @@ struct LiveView: View {
                             .foregroundStyle(.secondary)
 
                         if model.hasDepartureTime {
+                            #if !SKIP
                             Text(model.formattedCountdown)
                                 .font(.system(.largeTitle, design: .rounded).monospacedDigit().weight(.bold))
                                 .foregroundStyle(.green)
                                 .contentTransition(.numericText())
+                            #else
+                            Text(model.formattedCountdown)
+                                .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                                .foregroundStyle(.green)
+                            #endif
                         } else if model.isLoadingDetails {
-                            LoadingBar(width: 165, height: 36)
+                            LoadingBar(width: 165.0, height: 36.0)
                         }
 
                         let total = model.detailWagons.flatMap(\.seats).filter { !$0.isSpecial }.count
@@ -63,8 +69,8 @@ struct LiveView: View {
                             }
                         } else if model.isLoadingDetails {
                             VStack(alignment: .leading, spacing: 8) {
-                                LoadingBar(width: 100)
-                                LoadingBar(height: 8)
+                                LoadingBar(width: 100.0)
+                                LoadingBar(height: 8.0)
                             }
                             .accessibilityLabel("Pobieram dane o miejscach")
                         } else {
@@ -96,7 +102,7 @@ struct LiveView: View {
 
                 Section("Bilet") {
                     Picker("Zniżka", selection: $model.selectedDiscountIndex) {
-                        ForEach(model.discounts.indices, id: \.self) { idx in
+                        ForEach(0..<model.discounts.count, id: \.self) { idx in
                             Text(model.discounts[idx].name).tag(idx)
                         }
                     }
@@ -111,7 +117,7 @@ struct LiveView: View {
                     } else if model.ticketPrices.isEmpty && model.currentTrain.basePrice <= 0 {
                         LabeledContent("Cena") {
                             if model.isLoadingDetails {
-                                LoadingBar(width: 75, height: 20)
+                                LoadingBar(width: 75.0, height: 20.0)
                                     .accessibilityLabel("Pobieram cenę")
                             } else {
                                 Text("Brak danych").foregroundStyle(.secondary)
@@ -144,15 +150,19 @@ struct LiveView: View {
                 }
             }
         }
+        #if !SKIP
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.plain)
+        #endif
     }
     @ViewBuilder
     private var loadingSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                LoadingBar(width: 150, height: 18)
-                LoadingBar(width: 205)
-                LoadingBar(width: 120)
+                LoadingBar(width: 150.0, height: 18.0)
+                LoadingBar(width: 205.0)
+                LoadingBar(width: 120.0)
             }
             .padding(.vertical, 4)
         } header: {
@@ -161,15 +171,15 @@ struct LiveView: View {
 
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                LoadingBar(width: 130, height: 16)
-                LoadingBar(width: 190)
-                LoadingBar(width: 155, height: 34)
+                LoadingBar(width: 130.0, height: 16.0)
+                LoadingBar(width: 190.0)
+                LoadingBar(width: 155.0, height: 34.0)
                 HStack {
-                    LoadingBar(width: 105)
+                    LoadingBar(width: 105.0)
                     Spacer()
-                    LoadingBar(width: 50)
+                    LoadingBar(width: 50.0)
                 }
-                LoadingBar(height: 6)
+                LoadingBar(height: 6.0)
             }
             .padding(.vertical, 4)
         } header: {
@@ -179,14 +189,16 @@ struct LiveView: View {
         Section("Połączenie") {
             ForEach(0..<3, id: \.self) { _ in
                 HStack {
-                    LoadingBar(width: 145)
+                    LoadingBar(width: 145.0)
                     Spacer()
-                    LoadingBar(width: 45)
+                    LoadingBar(width: 45.0)
                 }
                 .padding(.vertical, 2)
             }
         }
+        #if !SKIP
         .accessibilityElement(children: .ignore)
+        #endif
         .accessibilityLabel("Pobieram połączenia")
     }
 }
@@ -196,13 +208,13 @@ struct LoadingBar: View {
     @State private var isPulsing = false
 
     var width: CGFloat? = nil
-    var height: CGFloat = 14
+    var height: CGFloat = 14.0
 
     var body: some View {
-        RoundedRectangle(cornerRadius: min(height / 2, 6))
-            .fill(Color(.tertiarySystemFill))
+        RoundedRectangle(cornerRadius: min(height / 2, 6.0))
+            .fill(Color.secondary.opacity(0.2))
             .frame(width: width, height: height)
-            .opacity(isPulsing && !reduceMotion ? 0.45 : 1)
+            .opacity(isPulsing && !reduceMotion ? 0.45 : 1.0)
             .animation(reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: isPulsing)
             .onAppear { isPulsing = true }
             .accessibilityHidden(true)

@@ -90,9 +90,15 @@ struct SegmentsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if !seg.wagons.isEmpty {
+                            #if !SKIP
                             Text(seg.wagons.map { "w\($0.wagon): \($0.free)" }.joined(separator: "  "))
                                 .font(.caption2.monospacedDigit())
                                 .foregroundStyle(.secondary)
+                            #else
+                            Text(seg.wagons.map { "w\($0.wagon): \($0.free)" }.joined(separator: "  "))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            #endif
                         }
                         ProgressView(value: Double(seg.occupancyPercent), total: 100)
                             .tint(seg.occupancyPercent > 60 ? .orange : .blue)
@@ -101,7 +107,11 @@ struct SegmentsView: View {
                 }
             }
         }
+        #if !SKIP
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.plain)
+        #endif
         .task(id: model.currentTrain.id) { await model.loadSegments() }
     }
 
@@ -147,9 +157,21 @@ struct SegmentsView: View {
                 }
                 ForEach(reminders.scheduled) { r in
                     HStack(alignment: .top, spacing: 10) {
+                        #if !SKIP
                         Text(r.fireDate.formatted(date: .omitted, time: .shortened))
                             .font(.footnote.monospacedDigit().weight(.semibold))
                             .frame(width: 44, alignment: .leading)
+                        #else
+                        let formatter: DateFormatter = {
+                            let f = DateFormatter()
+                            f.timeStyle = .short
+                            f.dateStyle = .none
+                            return f
+                        }()
+                        Text(formatter.string(from: r.fireDate))
+                            .font(.footnote.weight(.semibold))
+                            .frame(width: 44, alignment: .leading)
+                        #endif
                         VStack(alignment: .leading, spacing: 1) {
                             Text(r.title).font(.footnote.weight(.semibold))
                             Text(r.body).font(.caption).foregroundStyle(.secondary)
@@ -341,6 +363,7 @@ private struct WagonMatrixSection: View {
         Button {
             selected = (wagon, leg.legIndex)
         } label: {
+            #if !SKIP
             Text(c.map { "\($0.free)" } ?? "–")
                 .font(.caption2.monospacedDigit().weight(.semibold))
                 .foregroundStyle(c == nil ? Color.secondary : .primary)
@@ -350,13 +373,24 @@ private struct WagonMatrixSection: View {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .strokeBorder(isSel ? Color.white : (isPlanned ? Color.blue : Color.clear), lineWidth: isSel ? 2 : 2)
                 )
+            #else
+            Text(c.map { "\($0.free)" } ?? "–")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(c == nil ? Color.secondary : .primary)
+                .frame(width: cell, height: 26.0)
+                .background(color(c), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(isSel ? Color.white : (isPlanned ? Color.blue : Color.clear), lineWidth: 2.0)
+                )
+            #endif
         }
         .buttonStyle(.plain)
     }
 
     private func color(_ c: WagonCount?) -> Color {
-        guard let c else { return Color(.tertiarySystemFill) }
-        if c.free == 0 { return Color(.tertiarySystemFill) }
+        guard let c else { return Color.secondary.opacity(0.2) }
+        if c.free == 0 { return Color.secondary.opacity(0.2) }
         let ratio = Double(c.free) / Double(max(c.total, 1))
         return ratio > 0.25 ? .green.opacity(0.45) : .orange.opacity(0.45)
     }

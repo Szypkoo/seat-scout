@@ -1,6 +1,7 @@
-package com.example.seatscout
+package seat.scout
 
 import android.annotation.SuppressLint
+import android.app.Application
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -11,6 +12,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
 class AndroidWebSession(private val context: Context) {
@@ -22,6 +24,33 @@ class AndroidWebSession(private val context: Context) {
     companion object {
         private const val TAG = "SeatScout-Net"
         private const val BASE_URL = "https://ebilet.intercity.pl"
+
+        @Volatile
+        var sharedContext: Context? = null
+
+        @Volatile
+        private var sharedSessionInstance: AndroidWebSession? = null
+
+        fun getShared(): AndroidWebSession {
+            return sharedSessionInstance ?: synchronized(this) {
+                sharedSessionInstance ?: run {
+                    val ctx = sharedContext ?: runCatching {
+                        val actThread = Class.forName("android.app.ActivityThread")
+                        actThread.getMethod("currentApplication").invoke(null) as? Application
+                    }.getOrNull() ?: error("Android Context not available for WebSession")
+                    AndroidWebSession(ctx).also {
+                        it.start()
+                        sharedSessionInstance = it
+                    }
+                }
+            }
+        }
+
+        fun executeFetchSync(method: String, url: String, body: String?): Pair<Int, ByteArray>? {
+            return runBlocking {
+                getShared().executeFetch(method, url, body)
+            }
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -109,9 +138,7 @@ class AndroidWebSession(private val context: Context) {
 
             wv.evaluateJavascript(script) { resultJson ->
                 try {
-                    // evaluateJavascript returns a JSON string, which may be quoted
                     val cleanJson = if (resultJson != null && resultJson.startsWith("\"") && resultJson.endsWith("\"")) {
-                        // Unescape outer JSON string if double-encoded
                         JSONObject("{\"v\":$resultJson}").getString("v")
                     } else {
                         resultJson ?: ""

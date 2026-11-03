@@ -46,22 +46,24 @@ enum ReminderPlanner {
         case (true, false): return "wstań – dalej brak wolnych miejsc"
         case (false, true): return "możesz usiąść → \(people(b))"
         case (false, false): return ""
+        default: return ""
         }
     }
 
+    private struct ReminderKey: Hashable { var eva: UInt32; var kind: Int }
+
     static func reminders(plan: CommittedPlan, arr: [UInt32: Int64], dep: [UInt32: Int64],
                           now: Date, timeZone: TimeZone, minLead: TimeInterval = 15) -> [Reminder] {
-        struct Key: Hashable { var eva: UInt32; var kind: Int }
-        var lines: [Key: [String]] = [:]
+        var lines: [ReminderKey: [String]] = [:]
         var names: [UInt32: String] = [:]
-        var lead: [Key: Int] = [:]
+        var lead: [ReminderKey: Int] = [:]
         let multi = plan.people.count > 1
 
         for (pi, steps) in plan.people.enumerated() {
             guard let first = steps.first, let last = steps.last else { continue }
             let prefix = multi ? "Osoba \(pi + 1): " : ""
             names[first.fromEva] = first.fromName
-            let start = Key(eva: first.fromEva, kind: 0)
+            let start = ReminderKey(eva: first.fromEva, kind: 0)
             lines[start, default: []].append(prefix + (first.seat != nil ? "twój fotel: \(people(first))" : "brak wolnych miejsc na początku – stoisz do \(first.toName)"))
             lead[start] = 10
 
@@ -70,13 +72,13 @@ enum ReminderPlanner {
                 names[a.toEva] = a.toName
                 let line = changeLine(from: a, to: b)
                 guard !line.isEmpty else { continue }
-                let k = Key(eva: a.toEva, kind: 1)
+                let k = ReminderKey(eva: a.toEva, kind: 1)
                 lines[k, default: []].append(prefix + line)
                 let walk = (a.seat != nil && b.seat != nil) ? min(abs(a.wagon - b.wagon), 4) : 0
                 lead[k] = max(lead[k] ?? 0, 3 + walk)
             }
             names[last.toEva] = last.toName
-            let end = Key(eva: last.toEva, kind: 2)
+            let end = ReminderKey(eva: last.toEva, kind: 2)
             lines[end, default: []].append(prefix + "wysiadasz")
             lead[end] = 5
         }

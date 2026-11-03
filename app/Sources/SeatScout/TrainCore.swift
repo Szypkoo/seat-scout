@@ -1,5 +1,7 @@
 import Foundation
+#if !SKIP
 import CSeatScout
+#endif
 
 
 struct CoreError: Error, CustomStringConvertible {
@@ -7,11 +9,21 @@ struct CoreError: Error, CustomStringConvertible {
     let message: String
     var httpStatus: Int32 = 0
 
-    var isBlocked: Bool { code == TC_ERR_BLOCKED.rawValue }
+    var isBlocked: Bool {
+        #if !SKIP
+        return code == TC_ERR_BLOCKED.rawValue
+        #else
+        return code == -3
+        #endif
+    }
     var description: String { "Seat Scout (\(code)): \(message)" }
 
     static func last(_ code: Int32) -> CoreError {
-        CoreError(code: code, message: String(cString: tc_last_error()), httpStatus: tc_last_http_status())
+        #if !SKIP
+        return CoreError(code: code, message: String(cString: tc_last_error()), httpStatus: tc_last_http_status())
+        #else
+        return CoreError(code: code, message: "Błąd rdzenia \(code)", httpStatus: 0)
+        #endif
     }
 }
 
@@ -67,8 +79,34 @@ struct CoreTrain: Identifiable, Hashable, Sendable {
 
     var departureHHMM: String { Self.hhmm(departure) }
     var arrivalHHMM: String { Self.hhmm(arrival) }
-    var departureCompact: String { departure.filter(\.isNumber).prefix(12).description }
-    var arrivalCompact: String { arrival.filter(\.isNumber).prefix(12).description }
+    var departureCompact: String {
+        #if !SKIP
+        return departure.filter(\.isNumber).prefix(12).description
+        #else
+        var res = ""
+        for ch in departure {
+            if ch >= "0" && ch <= "9" {
+                res += String(ch)
+                if res.count == 12 { break }
+            }
+        }
+        return res
+        #endif
+    }
+    var arrivalCompact: String {
+        #if !SKIP
+        return arrival.filter(\.isNumber).prefix(12).description
+        #else
+        var res = ""
+        for ch in arrival {
+            if ch >= "0" && ch <= "9" {
+                res += String(ch)
+                if res.count == 12 { break }
+            }
+        }
+        return res
+        #endif
+    }
 
     private static func hhmm(_ s: String) -> String {
         guard s.count >= 16 else { return s }
@@ -128,10 +166,18 @@ func coreClock(_ minutes: Int64) -> String {
 }
 
 func coreCompactMinutes(_ compact: String) -> Int64? {
+    #if !SKIP
     var out: Int64 = 0
     return tc_compact_minutes(compact, &out) == 0 ? out : nil
+    #else
+    guard compact.count >= 12 else { return nil }
+    let s = compact.dropFirst(8)
+    guard let h = Int64(s.prefix(2)), let m = Int64(s.dropFirst(2).prefix(2)) else { return nil }
+    return h * 60 + m
+    #endif
 }
 
+#if !SKIP
 final class CoreRoute: @unchecked Sendable {
     private let handle: OpaquePointer
     let stops: [CoreStop]
@@ -166,11 +212,29 @@ final class CoreRoute: @unchecked Sendable {
                         progress: Double(st.progress_permille) / 1000, stops: preds)
     }
 }
+#else
+final class CoreRoute: @unchecked Sendable {
+    let stops: [CoreStop]
+    init(stops: [CoreStop] = []) { self.stops = stops }
+    func track(nowMinutes: Int64) -> TripInfo? { nil }
+}
+#endif
 
 func coreCompactTime(_ text: String) -> String? {
+    #if !SKIP
     var buf = [CChar](repeating: 0, count: 16)
     guard tc_time_compact(text, &buf, buf.count) == 0 else { return nil }
     return String(decoding: buf.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    #else
+    var res = ""
+    for ch in text {
+        if ch >= "0" && ch <= "9" {
+            res += String(ch)
+            if res.count == 12 { break }
+        }
+    }
+    return res.count == 12 ? res : nil
+    #endif
 }
 
 func coreHHMM(_ text: String) -> String {
@@ -200,6 +264,7 @@ struct SeatPlan: Sendable {
     var seatedPercent: Int { totalMinutes > 0 ? Int((Double(seatedMinutes) / Double(totalMinutes) * 100).rounded()) : 0 }
 }
 
+#if !SKIP
 final class SeatPlanner: @unchecked Sendable {
     private let handle: OpaquePointer
     private let lock = NSLock()
@@ -313,6 +378,7 @@ final class TrainCoreClient: @unchecked Sendable {
     static var version: String { String(cString: tc_version()) }
 
     func downloadStations(to path: String) throws {
+        #if !SKIP
         var data: UnsafeMutablePointer<UInt8>?
         var len = 0
         let rc = box.withTransport { tc_fetch_stations_packed($0, &data, &len) }
@@ -321,6 +387,7 @@ final class TrainCoreClient: @unchecked Sendable {
         let tmp = path + ".tmp"
         try Data(bytes: data, count: len).write(to: URL(fileURLWithPath: tmp))
         _ = try FileManager.default.replaceItemAt(URL(fileURLWithPath: path), withItemAt: URL(fileURLWithPath: tmp))
+        #endif
     }
 
     func searchConnections(date: String, from: CoreStation, to: CoreStation) throws -> [CoreTrain] {
@@ -473,3 +540,33 @@ private let transportCallback: TcHttpFn = { ctx, method, url, body, out in
     out.pointee.data = mem.assumingMemoryBound(to: CChar.self)
     return 0
 }
+#else
+final class SeatPlanner: @unchecked Sendable {
+    init?(arrivals: [Int32], departures: [Int32]) {}
+    func setLeg(_ leg: Int, wagons: [CoreWagon]) {}
+    func solve(board: Int, alight: Int, changePenaltyMinutes: Int) -> SeatPlan? { nil }
+    func solvePairs(board: Int, alight: Int, changePenaltyMinutes: Int) -> SeatPlan? { nil }
+    func solveMany(board: Int, alight: Int, changePenaltyMinutes: Int, people: Int) -> [SeatPlan]? { nil }
+    func solveSeparate(board: Int, alight: Int, changePenaltyMinutes: Int) -> (SeatPlan, SeatPlan)? { nil }
+}
+
+final class StationDictionary: @unchecked Sendable {
+    init?(path: String) {}
+    var count: Int { 0 }
+    func find(_ query: String) -> CoreStation? { nil }
+    func station(eva: UInt32) -> CoreStation? { nil }
+    func suggest(_ query: String, limit: Int = 8) -> [CoreStation] { [] }
+}
+
+final class TrainCoreClient: @unchecked Sendable {
+    init(transport: any HTTPTransport) {}
+    static var version: String { "0.1.0-android" }
+    func downloadStations(to path: String) throws {}
+    func searchConnections(date: String, from: CoreStation, to: CoreStation) throws -> [CoreTrain] { [] }
+    func seats(train: CoreTrain, from: CoreStation, to: CoreStation, travelClass: Int = 2, excludeSpecial: Bool = true) throws -> [CoreWagon] { [] }
+    func seats(train: CoreTrain, from: CoreStation, to: CoreStation, departure: String, arrival: String, travelClass: Int = 2, excludeSpecial: Bool = true) throws -> [CoreWagon] { [] }
+    func route(train: CoreTrain, from: CoreStation, to: CoreStation) throws -> [CoreStop] { [] }
+    func routeHandle(train: CoreTrain, from: CoreStation, to: CoreStation) throws -> CoreRoute { CoreRoute() }
+    func price(train: CoreTrain, travelClass: Int = 2, discountCode: Int32) throws -> Double { 0.0 }
+}
+#endif

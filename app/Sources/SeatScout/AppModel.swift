@@ -136,7 +136,7 @@ final class AppModel: ObservableObject {
     }
 
     var savingsAmount: Double {
-        max(0, (ticketPrices[0] ?? currentTrain.basePrice) - calculatedPrice)
+        max(0.0, (ticketPrices[0] ?? currentTrain.basePrice) - calculatedPrice)
     }
 
     var hasDepartureTime: Bool { departureDate != nil }
@@ -172,7 +172,13 @@ final class AppModel: ObservableObject {
         if isLive { Task { await loadDetails() } }
     }
 
+    #if !SKIP
     func setMySeat(_ seat: MySeat?) {
+        updateMySeat(seat)
+    }
+    #endif
+
+    func updateMySeat(_ seat: MySeat?) {
         mySeat = seat
         if let key = seatKey {
             prefs.seats[key] = seat.map { SavedSeat(wagon: $0.wagon, number: $0.number) }
@@ -393,7 +399,10 @@ final class AppModel: ObservableObject {
         let cachedDetails = await Task.detached { DiskCache.load(DetailsSnapshot.self, prefix: "details", key: detailsKey) }.value
         guard token == detailsToken else { return }
         if let c = cachedDetails, !c.wagons.isEmpty {
-            let prices = Dictionary(uniqueKeysWithValues: c.prices.compactMap { k, v in Int(k).map { ($0, v) } })
+            var prices: [Int: Double] = [:]
+            for (k, v) in c.prices {
+                if let i = Int(k) { prices[i] = v }
+            }
             applyDetails(core: core, from: from, to: to, wagons: c.wagons.map(\.core), prices: prices, note: c.priceNote)
             let age = Int(Date().timeIntervalSince(c.savedAt))
             log(.info, "app", "szczegóły z dysku (sprzed \(age) s)")
@@ -404,7 +413,7 @@ final class AppModel: ObservableObject {
         }
 
         let codes: [(Int, Int32)] = [(0, 1010), (37, 1710), (51, 1990)]
-        let (prices, note): ([Int: Double], String?) = await Task.detached {
+        let pricePair = await Task.detached {
             var out: [Int: Double] = [:]
             var note: String?
             for (percent, code) in codes {
@@ -424,6 +433,8 @@ final class AppModel: ObservableObject {
             }
             return (out, note)
         }.value
+        let prices = pricePair.0
+        let note = pricePair.1
         guard token == detailsToken, let idx0 = trains.firstIndex(where: { $0.id == String(core.number) }) else { return }
         ticketPrices = prices
         priceNote = prices.isEmpty ? note : nil
@@ -449,7 +460,7 @@ final class AppModel: ObservableObject {
             let best = wagons.max { free($0) < free($1) }
             trains[idx] = Self.trainInfo(core, from: from, to: to,
                                          price: prices[0] ?? trains[idx].basePrice,
-                                         wagon: best?.wagon ?? 0, free: wagons.map(free).reduce(0, +))
+                                         wagon: best?.wagon ?? 0, free: wagons.map { free($0) }.reduce(0, +))
             if let best {
                 detailWagons = wagons
                 log(.info, "app", "wagon \(best.wagon): \(free(best)) wolnych z \(best.seats.count)")
@@ -457,8 +468,10 @@ final class AppModel: ObservableObject {
                 log(.warn, "app", "brak wagonów z miejscami w odpowiedzi")
             }
             if !wagons.isEmpty {
+                var strPrices: [String: Double] = [:]
+                for (k, v) in prices { strPrices[String(k)] = v }
                 let snapshot = DetailsSnapshot(key: detailsKey, savedAt: Date(), wagons: wagons.map { CachedWagon($0, withLayout: true) },
-                                               prices: Dictionary(uniqueKeysWithValues: prices.map { (String($0.key), $0.value) }),
+                                               prices: strPrices,
                                                priceNote: prices.isEmpty ? note : nil)
                 await Task.detached { DiskCache.save(snapshot, prefix: "details", key: detailsKey) }.value
             }
@@ -490,7 +503,7 @@ final class AppModel: ObservableObject {
         func free(_ w: CoreWagon) -> Int { w.seats.filter { $0.isFree && !$0.isSpecial }.count }
         let best = wagons.max { free($0) < free($1) }
         trains[idx] = Self.trainInfo(core, from: from, to: to, price: prices[0] ?? trains[idx].basePrice,
-                                     wagon: best?.wagon ?? 0, free: wagons.map(free).reduce(0, +))
+                                     wagon: best?.wagon ?? 0, free: wagons.map { free($0) }.reduce(0, +))
         if best != nil {
             detailWagons = wagons
         }
@@ -572,7 +585,10 @@ final class AppModel: ObservableObject {
            snap.stops.count >= 2 {
             guard segmentsFor == trainId else { return }
             let stops = snap.stops.map(\.core)
-            let legs = Dictionary(uniqueKeysWithValues: snap.legs.compactMap { k, w in Int(k).map { ($0, w.map(\.core)) } })
+            var legs: [Int: [CoreWagon]] = [:]
+            for (k, w) in snap.legs {
+                if let i = Int(k) { legs[i] = w.map(\.core) }
+            }
             applyPlanData(stops: stops, legs: legs, from: from, to: to, resetRange: true)
             planDataAge = snap.savedAt
             log(.info, "plan", "z dysku: \(legs.count) odcinków sprzed \(Int(Date().timeIntervalSince(snap.savedAt))) s")
@@ -607,13 +623,15 @@ final class AppModel: ObservableObject {
                 var failed = 0, done = 0, nextLeg = 0
                 var fresh: [Int: [CoreWagon]] = [:]
                 let total = stops.count - 1
-                await withTaskGroup(of: (Int, [CoreWagon]?).self) { group in
+                await withTaskGroup(of: LegLoadResult.self) { group in
                     while nextLeg < min(2, total) {
                         let n = nextLeg
                         nextLeg += 1
-                        group.addTask { (n, Self.loadLeg(n, stops: stops, client: client, dict: dict, core: core)) }
+                        group.addTask { LegLoadResult(index: n, wagons: Self.loadLeg(n, stops: stops, client: client, dict: dict, core: core)) }
                     }
-                    for await (n, wagons) in group {
+                    for await res in group {
+                        let n = res.index
+                        let wagons = res.wagons
                         done += 1
                         if let wagons {
                             fresh[n] = wagons
@@ -636,17 +654,31 @@ final class AppModel: ObservableObject {
                         if nextLeg < total, !Task.isCancelled {
                             let m = nextLeg
                             nextLeg += 1
-                            group.addTask { (m, Self.loadLeg(m, stops: stops, client: client, dict: dict, core: core)) }
+                            group.addTask { LegLoadResult(index: m, wagons: Self.loadLeg(m, stops: stops, client: client, dict: dict, core: core)) }
                         }
                     }
                 }
 
                 if !fresh.isEmpty {
                     let failedCount = failed
+                    #if !SKIP
                     let merged: [Int: [CoreWagon]] = await MainActor.run { (self?.legsData ?? [:]).merging(fresh) { _, new in new } }
+                    #else
+                    let merged: [Int: [CoreWagon]] = await MainActor.run {
+                        var res = self?.legsData ?? [:]
+                        for (k, v) in fresh {
+                            res[k] = v
+                        }
+                        return res
+                    }
+                    #endif
+                    var cachedLegs: [String: [CachedWagon]] = [:]
+                    for (k, v) in merged {
+                        cachedLegs[String(k)] = v.map { CachedWagon($0) }
+                    }
                     let snapshot = PlanSnapshot(
-                        key: key, savedAt: Date(), stops: stops.map(CachedStop.init),
-                        legs: Dictionary(uniqueKeysWithValues: merged.map { (String($0.key), $0.value.map { CachedWagon($0) }) }))
+                        key: key, savedAt: Date(), stops: stops.map { CachedStop($0) },
+                        legs: cachedLegs)
                     await Task.detached { DiskCache.save(snapshot, prefix: "plan", key: key) }.value
                     await MainActor.run {
                         guard let self, self.segmentsFor == trainId else { return }
@@ -829,6 +861,17 @@ final class AppModel: ObservableObject {
         recomputePlans()
     }
 
+    private struct LegLoadResult: Sendable {
+        let index: Int
+        let wagons: [CoreWagon]?
+    }
+
+    private struct PlanSolveResult: Sendable {
+        var main: SeatPlan?
+        var single: SeatPlan?
+        var others: [SeatPlan] = []
+    }
+
     private func recomputePlans() {
         planToken += 1
         let token = planToken
@@ -843,18 +886,17 @@ final class AppModel: ObservableObject {
         singleSeatPlan = nil
         additionalPlans = []
         Task {
-            struct Result: Sendable { var main: SeatPlan?; var single: SeatPlan?; var others: [SeatPlan] = [] }
-            let r: Result = await Task.detached {
+            let r: PlanSolveResult = await Task.detached {
                 if people == 1 {
-                    return Result(main: planner.solve(board: b, alight: a, changePenaltyMinutes: 10),
+                    return PlanSolveResult(main: planner.solve(board: b, alight: a, changePenaltyMinutes: 10),
                                   single: planner.solve(board: b, alight: a, changePenaltyMinutes: 100_000))
                 }
                 if people == 2 && together {
-                    return Result(main: planner.solvePairs(board: b, alight: a, changePenaltyMinutes: 10),
+                    return PlanSolveResult(main: planner.solvePairs(board: b, alight: a, changePenaltyMinutes: 10),
                                   single: planner.solvePairs(board: b, alight: a, changePenaltyMinutes: 100_000))
                 }
-                guard let plans = planner.solveMany(board: b, alight: a, changePenaltyMinutes: 10, people: people) else { return Result() }
-                return Result(main: plans.first, others: Array(plans.dropFirst()))
+                guard let plans = planner.solveMany(board: b, alight: a, changePenaltyMinutes: 10, people: people) else { return PlanSolveResult() }
+                return PlanSolveResult(main: plans.first, others: Array(plans.dropFirst()))
             }.value
             guard token == planToken, b == planBoard, a == planAlight, people == planPeople, together == planTogether else { return }
             balancedPlan = r.main

@@ -23,7 +23,11 @@ struct SavedView: View {
             permissionSection
             historySection
         }
+        #if !SKIP
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.plain)
+        #endif
         .task { await alerts.refreshPermission() }
     }
 

@@ -3,13 +3,13 @@ import SwiftUI
 struct SeatsView: View {
     @EnvironmentObject private var model: AppModel
 
-    @State private var legChoice: Int?
+    @State private var legChoice: Int = -1
     @State private var wagonChoice: Int?
     @State private var selected: Int?
 
 
     private var sourceWagons: [CoreWagon] {
-        if let leg = legChoice, let w = model.legWagons(leg) { return w }
+        if legChoice >= 0, let w = model.legWagons(legChoice) { return w }
         return model.detailWagons
     }
 
@@ -44,8 +44,8 @@ struct SeatsView: View {
     }
 
     private var sourceTitle: String {
-        guard let leg = legChoice, model.planStops.indices.contains(leg + 1) else { return "Cała trasa" }
-        return "\(leg + 1). \(model.planStops[leg].name) → \(model.planStops[leg + 1].name)"
+        guard legChoice >= 0, model.planStops.indices.contains(legChoice + 1) else { return "Cała trasa" }
+        return "\(legChoice + 1). \(model.planStops[legChoice].name) → \(model.planStops[legChoice + 1].name)"
     }
 
 
@@ -57,7 +57,7 @@ struct SeatsView: View {
                     Section {
                         HStack(spacing: 8) {
                             ForEach(0..<4, id: \.self) { _ in
-                                LoadingBar(width: 56, height: 48)
+                                LoadingBar(width: 56.0, height: 48.0)
                             }
                         }
                         .padding(.vertical, 2)
@@ -67,9 +67,9 @@ struct SeatsView: View {
                     Section {
                         ForEach(0..<2, id: \.self) { _ in
                             HStack {
-                                LoadingBar(width: 125)
+                                LoadingBar(width: 125.0)
                                 Spacer()
-                                LoadingBar(width: 55)
+                                LoadingBar(width: 55.0)
                             }
                             .padding(.vertical, 2)
                         }
@@ -78,11 +78,11 @@ struct SeatsView: View {
                         VStack(spacing: 12) {
                             ForEach(0..<4, id: \.self) { _ in
                                 HStack(spacing: 8) {
-                                    LoadingBar(width: 36, height: 36)
-                                    LoadingBar(width: 36, height: 36)
+                                    LoadingBar(width: 36.0, height: 36.0)
+                                    LoadingBar(width: 36.0, height: 36.0)
                                     Spacer(minLength: 20)
-                                    LoadingBar(width: 36, height: 36)
-                                    LoadingBar(width: 36, height: 36)
+                                    LoadingBar(width: 36.0, height: 36.0)
+                                    LoadingBar(width: 36.0, height: 36.0)
                                 }
                             }
                         }
@@ -91,7 +91,9 @@ struct SeatsView: View {
                         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.secondary.opacity(0.2)))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
+                        #if !SKIP
                         .accessibilityElement(children: .ignore)
+                        #endif
                         .accessibilityLabel("Pobieram miejsca w wagonach")
                     } header: {
                         Text("Mapa wagonu")
@@ -111,7 +113,12 @@ struct SeatsView: View {
                 }
             }
         }
+        #if !SKIP
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.plain)
+        #endif
+        #if !SKIP
         .safeAreaInset(edge: .bottom) {
             if let w = currentWagon, let n = selected, let seat = w.seats.first(where: { $0.number == n }) {
                 SeatDetailPanel(wagon: w, seat: seat, onClose: { selected = nil })
@@ -120,10 +127,19 @@ struct SeatsView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        #else
+        .overlay(alignment: .bottom) {
+            if let w = currentWagon, let n = selected, let seat = w.seats.first(where: { $0.number == n }) {
+                SeatDetailPanel(wagon: w, seat: seat, onClose: { selected = nil })
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+            }
+        }
+        #endif
         .animation(.snappy, value: selected)
         .task { await model.loadSegments() }
         .onChange(of: model.currentTrain.id) { _, _ in
-            legChoice = nil; wagonChoice = nil; selected = nil
+            legChoice = -1; wagonChoice = nil; selected = nil
         }
     }
 
@@ -131,10 +147,10 @@ struct SeatsView: View {
     private var sourceSection: some View {
         Section {
             Picker(selection: $legChoice) {
-                Text("Cała trasa").tag(Int?.none)
+                Text("Cała trasa").tag(-1)
                 ForEach(0..<model.legCount, id: \.self) { i in
                     if model.legWagons(i) != nil {
-                        Text("\(i + 1). \(model.planStops[i].name) → \(model.planStops[i + 1].name)").tag(Int?.some(i))
+                        Text("\(i + 1). \(model.planStops[i].name) → \(model.planStops[i + 1].name)").tag(i)
                     }
                 }
             } label: {
@@ -142,7 +158,7 @@ struct SeatsView: View {
             }
             .onChange(of: legChoice) { _, _ in selected = nil }
         } footer: {
-            Text(legChoice == nil
+            Text(legChoice < 0
                  ? "Miejsca wolne na całej trasie Twojego przejazdu – takie jak widzi oficjalna aplikacja."
                  : "Miejsca wolne tylko na wybranym odcinku: \(sourceTitle).")
         }
@@ -167,7 +183,7 @@ struct SeatsView: View {
         let isCurrent = w.wagon == currentWagon?.wagon
         let count = free(w)
         let countColor: Color = count == 0 ? Color.secondary : (isCurrent ? Color.white : Color.green)
-        let background: Color = isCurrent ? Color.accentColor : Color(.tertiarySystemFill)
+        let background: Color = isCurrent ? Color.accentColor : Color.secondary.opacity(0.2)
         let textColor: Color = isCurrent ? Color.white : Color.primary
         return Button {
             wagonChoice = w.wagon
@@ -175,9 +191,15 @@ struct SeatsView: View {
         } label: {
             VStack(spacing: 2) {
                 Text("W\(w.wagon)").font(.subheadline.weight(.bold))
+                #if !SKIP
                 Text("\(count)")
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(countColor)
+                #else
+                Text("\(count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(countColor)
+                #endif
             }
             .frame(minWidth: 44)
             .padding(.horizontal, 8)
@@ -265,7 +287,7 @@ struct SeatsView: View {
     private var legendItems: [LegendItem] {
         [
             LegendItem(label: "Wolne", fill: Color.green.opacity(0.4), stroke: .green),
-            LegendItem(label: "Zajęte", fill: Color(.tertiarySystemFill), stroke: .clear),
+            LegendItem(label: "Zajęte", fill: Color.secondary.opacity(0.2), stroke: .clear),
             LegendItem(label: "OzN / wózek", fill: Color.orange.opacity(0.4), stroke: .clear),
             LegendItem(label: "Wybrane", fill: .blue, stroke: .clear),
             LegendItem(label: "Z planu", fill: .clear, stroke: .blue),
@@ -312,7 +334,7 @@ private struct WagonMapView: View {
         let toiletBlocks = mergedToiletBlocks
         return ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.tertiarySystemFill).opacity(0.5))
+                .fill(Color.secondary.opacity(0.1))
                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.5))
 
             ForEach(compartments?.groups ?? []) { group in
@@ -345,7 +367,7 @@ private struct WagonMapView: View {
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 5)
-                    .background(.regularMaterial, in: Capsule())
+                    .background(Color.secondary.opacity(0.15), in: Capsule())
                     .position(x: bounds.midX, y: bounds.midY)
                     .allowsHitTesting(false)
             }
@@ -360,7 +382,7 @@ private struct WagonMapView: View {
     }
 
     private var mergedToiletBlocks: [ToiletBlock] {
-        decor.filter { $0.isSign && ($0.code == "401" || $0.title.localizedCaseInsensitiveContains("toalet")) }
+        decor.filter { $0.isSign && ($0.code == "401" || $0.title.lowercased().contains("toalet")) }
             .compactMap { toilet in
                 let toiletBounds = CGRect(x: toilet.x, y: toilet.y, width: toilet.w, height: toilet.h)
                 let pieces = decor.filter { item in
@@ -429,18 +451,24 @@ private struct WagonMapView: View {
         let isPlanned = planned.contains([wagon.wagon, s.number])
         let isMine = mine?.wagon == wagon.wagon && mine?.number == s.number
         let usable = s.isFree && !s.isSpecial
-        let fill: Color = isSel ? .blue : (s.isSpecial ? .orange.opacity(0.35) : (usable ? Color.green.opacity(0.38) : Color(.tertiarySystemFill)))
+        let fill: Color = isSel ? .blue : (s.isSpecial ? .orange.opacity(0.35) : (usable ? Color.green.opacity(0.38) : Color.secondary.opacity(0.2)))
         let border: Color = isMine ? .yellow : (isPlanned ? .blue : (usable && !isSel ? .green : .clear))
         return Button { onSelect(s.number) } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous).fill(fill)
-                RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(border, lineWidth: isMine || isPlanned ? 3 : 1.5)
+                RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(border, lineWidth: isMine || isPlanned ? 3.0 : 1.5)
                 if s.isSpecial {
                     Image(systemName: "figure.roll").font(.system(size: side * 0.42)).foregroundStyle(.orange)
                 } else {
+                    #if !SKIP
                     Text("\(s.number)")
                         .font(.system(size: side * 0.34, weight: .semibold).monospacedDigit())
                         .foregroundStyle(isSel ? .white : (usable ? .primary : .secondary))
+                    #else
+                    Text("\(s.number)")
+                        .font(.system(size: side * 0.34, weight: .semibold))
+                        .foregroundStyle(isSel ? .white : (usable ? .primary : .secondary))
+                    #endif
                 }
                 if s.position == .window {
                     let leftEdge = CGFloat(xy.y) + cell / 2 < CGFloat(height) / 2
@@ -491,7 +519,7 @@ private struct SeatDetailPanel: View {
 
             if seat.isFree && !seat.isSpecial {
                 Button {
-                    model.setMySeat(isMine ? nil : AppModel.MySeat(wagon: wagon.wagon, number: seat.number))
+                    model.updateMySeat(isMine ? nil : AppModel.MySeat(wagon: wagon.wagon, number: seat.number))
                 } label: {
                     Label(isMine ? "To już Twój fotel (usuń)" : "To mój fotel", systemImage: isMine ? "star.fill" : "star")
                         .frame(maxWidth: .infinity)
@@ -502,7 +530,7 @@ private struct SeatDetailPanel: View {
             }
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(radius: 10, y: 2)
     }
 

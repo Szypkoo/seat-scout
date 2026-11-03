@@ -66,9 +66,9 @@ final class AppLog: ObservableObject, @unchecked Sendable {
 
     static func time(_ e: LogEntry) -> String { timeFormat.string(from: e.date) }
 
-    var text: String { entries.map(Self.line).joined(separator: "\n") }
+    var text: String { entries.map { Self.line($0) }.joined(separator: "\n") }
 }
 
-func log(_ level: LogLevel = .info, _ category: String, _ message: @autoclosure () -> String) {
-    AppLog.shared.add(level, category, message())
+func log(_ level: LogLevel = .info, _ category: String, _ message: String) {
+    AppLog.shared.add(level, category, message)
 }

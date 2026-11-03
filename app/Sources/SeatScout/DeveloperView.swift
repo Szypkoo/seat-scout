@@ -19,7 +19,7 @@ struct DeveloperView: View {
         return logs.entries.reversed().filter { e in
             (order.firstIndex(of: e.level) ?? 0) >= minIndex
                 && (category == "wszystkie" || e.category == category)
-                && (query.isEmpty || e.message.localizedCaseInsensitiveContains(query))
+                && (query.isEmpty || e.message.lowercased().contains(query.lowercased()))
         }
     }
 
@@ -41,7 +41,11 @@ struct DeveloperView: View {
             Section {
                 LabeledContent("Zadanie w tle", value: alerts.backgroundStatus)
                 if !alerts.diagnostics.isEmpty {
+                    #if !SKIP
                     Text(alerts.diagnostics).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                    #else
+                    Text(alerts.diagnostics).font(.system(.caption2, design: .monospaced))
+                    #endif
                 }
                 Button("Sprawdź zadania w tle (diagnostyka)") { alerts.logBackgroundDiagnostics() }
                 Button("Spróbuj zaplanować zadanie w tle teraz") { alerts.scheduleBackgroundRefresh() }
@@ -79,27 +83,43 @@ struct DeveloperView: View {
                 ForEach(filtered) { e in
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
+                            #if !SKIP
                             Text(AppLog.time(e))
                                 .font(.caption2.monospacedDigit())
                                 .foregroundStyle(.secondary)
+                            #else
+                            Text(AppLog.time(e))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            #endif
                             Text(e.level.tag)
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(color(e.level))
                             Text(e.category)
                                 .font(.caption2.weight(.semibold))
                                 .padding(.horizontal, 5).padding(.vertical, 1)
-                                .background(.quaternary, in: Capsule())
+                                .background(Color.secondary.opacity(0.15), in: Capsule())
                         }
+                        #if !SKIP
                         Text(e.message)
                             .font(.system(.caption, design: .monospaced))
                             .foregroundStyle(e.level == .error ? .red : .primary)
                             .textSelection(.enabled)
+                        #else
+                        Text(e.message)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(e.level == .error ? .red : .primary)
+                        #endif
                     }
                     .padding(.vertical, 1)
                 }
             }
         }
+        #if !SKIP
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.plain)
+        #endif
 
     }
 

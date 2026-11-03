@@ -153,69 +153,21 @@ final class WebSession: NSObject, WKNavigationDelegate {
     }
 }
 #else
-@MainActor
-final class WebSession: NSObject {
-    private var ready = false
-    private var nextSlot = ContinuousClock.now
-
-    override init() {
-        super.init()
-    }
-
-    func start() async throws {
-        ready = true
-    }
-
-    nonisolated static func ms(_ d: Duration) -> Int {
-        Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
-    }
-
-    nonisolated static func shortURL(_ url: String) -> String {
+final class WebSession: NSObject, @unchecked Sendable {
+    func start() async throws {}
+    static func shortURL(_ url: String) -> String {
         url.replacingOccurrences(of: "https://api-gateway.intercity.pl", with: "")
     }
-
-    func fetch(method: String, url: String, body: String?) async -> (status: Int32, body: Data)? {
-        let t0 = ContinuousClock.now
-        let name = "\(method) \(Self.shortURL(url))"
-        let web = com.example.seatscout.AndroidWebSession(com.example.seatscout.MainActivity.instance.applicationContext)
-        guard let pair = await web.executeFetch(method: method, url: url, body: body) else {
-            log(.error, "net", "\(name) – błąd sieci / timeout Android")
-            return nil
-        }
-        let status = Int32(pair.first)
-        let data = Data(pair.second)
-        let took = Self.ms(ContinuousClock.now - t0)
-        let ok = (200..<300).contains(status)
-        log(ok ? .debug : .warn, "net", "\(name) → \(status) (\(data.count / 1024) KB, \(took) ms)")
-        return (status, data)
-    }
 }
-#endif
 
 final class WebViewTransport: HTTPTransport, @unchecked Sendable {
     private let session: WebSession
-
-    @MainActor init(session: WebSession) { self.session = session }
-
-    private final class Slot: @unchecked Sendable {
-        private let lock = NSLock()
-        private var value: (status: Int32, body: Data)?
-        func set(_ v: (status: Int32, body: Data)?) { lock.lock(); value = v; lock.unlock() }
-        func get() -> (status: Int32, body: Data)? { lock.lock(); defer { lock.unlock() }; return value }
-    }
+    init(session: WebSession) { self.session = session }
 
     func send(method: String, url: String, body: String?) -> (status: Int32, body: Data)? {
-        let sem = DispatchSemaphore(value: 0)
-        let slot = Slot()
-        let session = self.session
-        Task { @MainActor in
-            slot.set(await session.fetch(method: method, url: url, body: body))
-            sem.signal()
-        }
-        guard sem.wait(timeout: .now() + 45) == .success else {
-            log(.error, "net", "\(method) \(WebSession.shortURL(url)) – twardy timeout 45 s")
-            return nil
-        }
-        return slot.get()
+        // SKIP INSERT: val pair = seat.scout.AndroidWebSession.executeFetchSync(method, url, body) ?: return null
+        // SKIP INSERT: return Tuple2(pair.first, Data(pair.second))
+        return nil
     }
 }
+#endif

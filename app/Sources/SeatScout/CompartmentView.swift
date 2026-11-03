@@ -10,7 +10,10 @@ struct CompartmentLayout {
 
     init?(seats: [CoreSeat]) {
         guard !seats.isEmpty, seats.allSatisfy({ $0.xy != nil && $0.number % 10 != 0 }) else { return nil }
-        let grouped = Dictionary(grouping: seats, by: { $0.number / 10 })
+        var grouped: [Int: [CoreSeat]] = [:]
+        for s in seats {
+            grouped[s.number / 10, default: []].append(s)
+        }
         guard grouped.count >= 2 else { return nil }
 
         var result: [Group] = []

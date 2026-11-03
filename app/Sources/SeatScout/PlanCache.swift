@@ -48,22 +48,23 @@ struct CachedWagon: Codable {
         }
         seats = w.seats.map { s in
             var f = 0
-            if s.isFree { f |= 1 }
-            if s.isSpecial { f |= 2 }
-            if s.position == .window { f |= 4 }
-            if s.position == .aisle { f |= 8 }
-            if s.xy != nil { f |= 16 }
+            if s.isFree { f = f | 1 }
+            if s.isSpecial { f = f | 2 }
+            if s.position == .window { f = f | 4 }
+            if s.position == .aisle { f = f | 8 }
+            if s.xy != nil { f = f | 16 }
             return [s.number, f, s.xy?.x ?? 0, s.xy?.y ?? 0]
         }
     }
 
     var core: CoreWagon {
-        let list = seats.compactMap { a -> CoreSeat? in
-            guard a.count == 4 else { return nil }
+        var list: [CoreSeat] = []
+        for a in seats {
+            guard a.count == 4 else { continue }
             let f = a[1]
-            return CoreSeat(number: a[0], isFree: f & 1 != 0,
+            list.append(CoreSeat(number: a[0], isFree: f & 1 != 0,
                             position: f & 4 != 0 ? .window : (f & 8 != 0 ? .aisle : .unknown),
-                            isSpecial: f & 2 != 0, xy: f & 16 != 0 ? (a[2], a[3]) : nil)
+                            isSpecial: f & 2 != 0, xy: f & 16 != 0 ? (a[2], a[3]) : nil))
         }
         return CoreWagon(wagon: wagon, travelClass: cls, freeCount: list.filter { $0.isFree }.count,
                          occupiedCount: list.filter { !$0.isFree }.count, seats: list,
@@ -93,42 +94,62 @@ enum DiskCache {
     }
 
     private static func file(_ prefix: String, _ key: String) -> URL? {
-        let safe = String(key.map { $0.isLetter || $0.isNumber || $0 == "-" ? $0 : "_" })
+        let safe = String(key.map { ($0 >= "a" && $0 <= "z") || ($0 >= "A" && $0 <= "Z") || ($0 >= "0" && $0 <= "9") || $0 == "-" ? $0 : "_" })
         return dir?.appendingPathComponent("\(prefix)-\(safe).json")
     }
 
+    #if !SKIP
     static func load<T: Decodable>(_ type: T.Type, prefix: String, key: String) -> T? {
         guard let url = file(prefix, key), let data = try? Data(contentsOf: url) else { return nil }
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            log(.warn, "cache", "uszkodzony plik \(url.lastPathComponent): \(error.localizedDescription) – usuwam")
+            log(LogLevel.warn, "cache", "uszkodzony plik \(url.lastPathComponent): \(error.localizedDescription) – usuwam")
             try? FileManager.default.removeItem(at: url)
             return nil
         }
     }
+    #else
+    static func load<T: Decodable>(_ type: T.Type, prefix: String, key: String) -> T? {
+        guard let url = file(prefix, key), let data = try? Data(contentsOf: url) else { return nil }
+        do {
+            if type == DetailsSnapshot.self {
+                return try JSONDecoder().decode(DetailsSnapshot.self, from: data) as? T
+            }
+            if type == PlanSnapshot.self {
+                return try JSONDecoder().decode(PlanSnapshot.self, from: data) as? T
+            }
+            return nil
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+    }
+    #endif
 
     static func save<T: Encodable>(_ value: T, prefix: String, key: String) {
         guard let url = file(prefix, key) else { return }
         do {
-            try JSONEncoder().encode(value).write(to: url, options: .atomic)
+            try JSONEncoder().encode(value).write(to: url, options: Data.WritingOptions.atomic)
             prune(prefix: prefix, keep: url)
         } catch {
-            log(.warn, "cache", "zapis \(url.lastPathComponent) nieudany: \(error.localizedDescription)")
+            log(LogLevel.warn, "cache", "zapis \(url.lastPathComponent) nieudany: \(error.localizedDescription)")
         }
     }
 
     private static func prune(prefix: String, keep: URL) {
+        #if !SKIP
         guard let dir,
               let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])
         else { return }
         let mine = files.filter { $0.lastPathComponent.hasPrefix("\(prefix)-") && $0.pathExtension == "json" }
             .sorted {
-                let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
                 return a > b
             }
         for old in mine.dropFirst(8) where old != keep { try? FileManager.default.removeItem(at: old) }
+        #endif
     }
 
     static func clearAll() {
