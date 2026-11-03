@@ -33,10 +33,14 @@ struct CachedWagon: Codable {
     var width: Int?
     var height: Int?
     var decor: [CachedDecor]?
+    var direction: Int?
+    var compartments: Int?
 
     init(_ w: CoreWagon, withLayout: Bool = false) {
         wagon = w.wagon
         cls = w.travelClass
+        direction = w.direction
+        compartments = w.compartments
         if withLayout {
             width = w.width
             height = w.height
@@ -64,7 +68,7 @@ struct CachedWagon: Codable {
         return CoreWagon(wagon: wagon, travelClass: cls, freeCount: list.filter { $0.isFree }.count,
                          occupiedCount: list.filter { !$0.isFree }.count, seats: list,
                          width: width ?? 0, height: height ?? 0,
-                         decor: (decor ?? []).map { CoreDecor(x: $0.x, y: $0.y, w: $0.w, h: $0.h, isSign: $0.sign, code: $0.code, title: $0.title) })
+                         decor: (decor ?? []).map { CoreDecor(x: $0.x, y: $0.y, w: $0.w, h: $0.h, isSign: $0.sign, code: $0.code, title: $0.title) }, direction: direction ?? 0, compartments: compartments ?? -1)
     }
 }
 

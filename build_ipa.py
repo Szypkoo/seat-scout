@@ -41,11 +41,10 @@ def package(source):
                     if "fetch" not in modes:
                         modes.append("fetch")
                     info["UIBackgroundModes"] = modes
-                    info["NSSupportsLiveActivities"] = True
                     data = plistlib.dumps(info)
                 output.writestr(item, data)
     print(f"Paczka: {OUTPUT}")
-    print("Przed instalacją podpisz ponownie aplikację i widżet.")
+    print("Przed instalacją podpisz ponownie aplikację.")
 
 
 def main():

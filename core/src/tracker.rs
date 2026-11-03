@@ -60,11 +60,11 @@ pub fn track(stops: &[Stop], now: i64) -> Option<TripStatus> {
 
     let mut event: Option<(usize, bool, i64)> = None;
     for index in (0..stop_count).rev() {
-        if let Some(departure) = actual_times[index].1 {
+        if let Some(departure) = actual_times[index].1.filter(|&time| time <= now) {
             event = Some((index, true, departure - schedule[index].1));
             break;
         }
-        if let Some(arrival) = actual_times[index].0 {
+        if let Some(arrival) = actual_times[index].0.filter(|&time| time <= now) {
             event = Some((index, false, arrival - schedule[index].0));
             break;
         }
@@ -136,8 +136,8 @@ pub fn track(stops: &[Stop], now: i64) -> Option<TripStatus> {
                 sched_dep: scheduled_departure,
                 arr,
                 dep,
-                arr_actual: actual_times[index].0.is_some(),
-                dep_actual: actual_times[index].1.is_some(),
+                arr_actual: actual_times[index].0.is_some_and(|time| time <= now),
+                dep_actual: actual_times[index].1.is_some_and(|time| time <= now),
             }
         })
         .collect();
@@ -158,7 +158,7 @@ pub fn track(stops: &[Stop], now: i64) -> Option<TripStatus> {
     let progress = match state {
         TripState::NotStarted => 0.0,
         TripState::Finished => 1.0,
-        _ if end > start => ((now - start) as f64 / (end - start) as f64).clamp(0.0, 1.0),
+        _ if end > start => ((now - start) as f64 / (end - start) as f64).clamp(0.0, 0.99),
         _ => 0.0,
     };
 

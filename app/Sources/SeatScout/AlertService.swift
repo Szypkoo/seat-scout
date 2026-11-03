@@ -15,7 +15,6 @@ final class AlertService: ObservableObject {
     @Published private(set) var settings: AlertSettings
     @Published private(set) var history: [AlertEvent]
     @Published private(set) var isChecking = false
-    @Published private(set) var testAt: Date?
     @Published private(set) var permission: UNAuthorizationStatus = .notDetermined
 
     @Published private(set) var backgroundStatus = "jeszcze nie planowano"
@@ -26,6 +25,7 @@ final class AlertService: ObservableObject {
     private init() {
         settings = AlertStore.loadSettings()
         history = AlertStore.loadHistory()
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["test-alert"])
     }
 
 
@@ -198,33 +198,18 @@ final class AlertService: ObservableObject {
     }
 
 
-    private func notify(title: String, body: String, delay: TimeInterval? = nil, id: String = UUID().uuidString) async {
+    private func notify(title: String, body: String) async {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
         content.interruptionLevel = .timeSensitive
-        let trigger = delay.map { UNTimeIntervalNotificationTrigger(timeInterval: $0, repeats: false) }
         do {
-            try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+            try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
         } catch {
             addEvent(.error, "Nie udało się dodać powiadomienia: \(error.localizedDescription)")
         }
     }
-
-    func scheduleTestNotification() async {
-        guard await requestPermission() else {
-            addEvent(.error, "Test: brak zgody na powiadomienia – włącz je w Ustawieniach iOS")
-            return
-        }
-        let t = settings.target
-        let title = "Test · zwolniło się miejsce" + (t.map { " · \($0.label)" } ?? "")
-        let body = (t.map { "\($0.route), \($0.day): " } ?? "") + "wagon 14, miejsce 61 (okno). Tak będzie wyglądać alert."
-        await notify(title: title, body: body, delay: 60, id: "test-alert")
-        testAt = Date().addingTimeInterval(60)
-        addEvent(.info, "Zaplanowano powiadomienie testowe na \((testAt ?? Date()).formatted(date: .omitted, time: .standard))")
-    }
-
 
     nonisolated static func registerBackgroundTask() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: taskId, using: nil) { task in

@@ -7,22 +7,30 @@ struct TripSection: View {
         Section {
             if let trip = model.trip, !model.tripStops.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(title(trip)).font(.headline)
-                            if let sub = subtitle(trip) {
-                                Text(sub).font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            if let detail = detail(trip) {
-                                Text(detail).font(.footnote).foregroundStyle(.secondary)
-                            }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title(trip)).font(.headline)
+                        if let sub = subtitle(trip) {
+                            Text(sub).font(.subheadline).foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        delayBadge(trip)
+                        if let detail = detail(trip) {
+                            Text(detail).font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
-                    ProgressView(value: trip.progress).tint(.blue)
+                    delayBadge(trip)
+                    if !trip.isActual {
+                        ProgressView(value: trip.progress).tint(.blue)
+                        Text("Szacowany postęp według rozkładu")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.vertical, 4)
+
+                if let err = model.tripError {
+                    Label("Nie udało się odświeżyć danych: \(err)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
 
                 if let note = currentMessages(trip) {
                     Label(note, systemImage: "exclamationmark.bubble.fill")
@@ -49,7 +57,7 @@ struct TripSection: View {
             Text("Gdzie jest pociąg")
         } footer: {
             if let trip = model.trip {
-                Text((trip.isActual ? "Rzeczywiste godziny z Intercity" : "Wg rozkładu – Intercity jeszcze nie podaje rzeczywistych godzin")
+                Text((trip.isActual ? "Szacunkowo na podstawie godzin Intercity" : "Szacunkowo na podstawie rozkładu")
                      + (model.tripUpdated.map { " · zaktualizowano \($0.formatted(date: .omitted, time: .standard))" } ?? ""))
             }
         }
@@ -61,9 +69,9 @@ struct TripSection: View {
     private func title(_ t: TripInfo) -> String {
         switch t.state {
         case .notStarted: return "Przed odjazdem"
-        case .atStation(let i): return "Stoi na stacji \(name(i))"
-        case .between(let a, _): return "Odjechał z \(name(a))"
-        case .finished: return "Dojechał do \(name(model.tripStops.count - 1))"
+        case .atStation(let i): return "Szacowana stacja: \(name(i))"
+        case .between(let a, _): return "Szacunkowo po odjeździe z \(name(a))"
+        case .finished: return "Szacunkowo po przyjeździe do \(name(model.tripStops.count - 1))"
         }
     }
 
@@ -74,7 +82,7 @@ struct TripSection: View {
         case .atStation(let i):
             return i == model.tripStops.count - 1 ? nil : "Odjazd o \(coreClock(t.stops[i].dep))"
         case .between(_, let b):
-            return "Jedzie do \(name(b)) · przyjazd \(coreClock(t.stops[b].arr))\(t.minutesToNext > 0 ? " (za \(minutes(t.minutesToNext)))" : "")"
+            return "Następna stacja: \(name(b)) · przyjazd \(coreClock(t.stops[b].arr))\(t.minutesToNext > 0 ? " (za \(minutes(t.minutesToNext)))" : "")"
         case .finished:
             return nil
         }
@@ -90,8 +98,15 @@ struct TripSection: View {
         }
         guard let i = idx else { return nil }
         let s = model.tripStops[i]
-        let parts = [s.platform.isEmpty ? nil : "peron \(s.platform)", s.track.isEmpty ? nil : "tor \(s.track)"].compactMap { $0 }
-        return parts.isEmpty ? nil : "\(name(i)): " + parts.joined(separator: ", ")
+        let loc = location(s)
+        return loc.isEmpty ? nil : "\(name(i)): " + loc
+    }
+
+    private func location(_ stop: CoreStop) -> String {
+        let platform = stop.platform.replacingOccurrences(of: "\\n", with: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let track = stop.track.replacingOccurrences(of: "\\n", with: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return [platform.isEmpty ? nil : "peron\u{00a0}\(platform)", track.isEmpty ? nil : "tor\u{00a0}\(track)"]
+            .compactMap { $0 }.joined(separator: ", ")
     }
 
     private func currentMessages(_ t: TripInfo) -> String? {
@@ -106,11 +121,16 @@ struct TripSection: View {
     @ViewBuilder
     private func delayBadge(_ t: TripInfo) -> some View {
         if let d = t.delay {
-            Text(d > 0 ? "+\(d) min" : (d == 0 ? "o czasie" : "\(d) min"))
+            Text(d > 0 ? "wg Intercity +\(d) min" : (d == 0 ? "wg Intercity o czasie" : "wg Intercity \(d) min"))
                 .font(.footnote.weight(.bold))
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background((d > 0 ? Color.orange : Color.green).opacity(0.2), in: Capsule())
                 .foregroundStyle(d > 0 ? .orange : .green)
+        } else {
+            Text("Brak danych o opóźnieniu")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 
@@ -141,9 +161,9 @@ struct TripSection: View {
                 Text(s.name)
                     .font(.subheadline.weight(st == .current || st == .next ? .bold : .regular))
                     .foregroundStyle(st == .passed ? .secondary : .primary)
-                let loc = [s.platform.isEmpty ? nil : "peron \(s.platform)", s.track.isEmpty ? nil : "tor \(s.track)"].compactMap { $0 }
+                let loc = location(s)
                 if !loc.isEmpty {
-                    Text(loc.joined(separator: ", ")).font(.caption2).foregroundStyle(.secondary)
+                    Text(loc).font(.caption2).foregroundStyle(.secondary)
                 }
                 if !s.messages.isEmpty {
                     Text(s.messages).font(.caption2).foregroundStyle(.orange)

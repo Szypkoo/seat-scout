@@ -3,6 +3,3 @@ bundleID: com.example.seatscout
 product: SeatScout
 name: SeatScout
 displayName: Seat Scout
-extensions:
-- product: SeatScoutWidget
-  infoPath: Support/SeatScoutWidget-Info.plist

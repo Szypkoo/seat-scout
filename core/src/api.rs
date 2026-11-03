@@ -250,6 +250,7 @@ pub struct Sklad {
     pub schema: std::collections::HashMap<i64, String>,
     pub class1: Vec<i64>,
     pub class2: Vec<i64>,
+    pub direction: i32,
 }
 
 pub fn parse_sklad(v: &Value) -> Option<Sklad> {
@@ -286,6 +287,14 @@ pub fn parse_sklad(v: &Value) -> Option<Sklad> {
         schema,
         class1: nums("klasa1"),
         class2: nums("klasa2"),
+        direction: match (
+            v.get("kierunekJazdy").and_then(as_i64),
+            v.get("zmieniaKierunek").and_then(Value::as_bool),
+        ) {
+            (_, Some(true)) => 2,
+            (Some(direction @ (-1 | 1)), Some(false)) => direction as i32,
+            _ => 0,
+        },
     })
 }
 
@@ -467,6 +476,8 @@ fn fetch_wagon(
 }
 
 pub struct SegmentSeats {
+    pub direction: i32,
+    pub schema: std::collections::HashMap<i64, String>,
     pub rows: Vec<WagonSeats>,
     pub warnings: Vec<String>,
 }
@@ -498,6 +509,8 @@ pub fn seats_for_segment_ex(
             None => {
                 note("skład: odpowiedź bez pola `wagony`".into());
                 return Ok(SegmentSeats {
+                    direction: 0,
+                    schema: Default::default(),
                     rows: Vec::new(),
                     warnings: warnings.into_inner().unwrap_or_default(),
                 });
@@ -507,6 +520,8 @@ pub fn seats_for_segment_ex(
         Err(e) => {
             note(format!("skład niedostępny: {e}"));
             return Ok(SegmentSeats {
+                direction: 0,
+                schema: Default::default(),
                 rows: Vec::new(),
                 warnings: warnings.into_inner().unwrap_or_default(),
             });
@@ -574,6 +589,8 @@ pub fn seats_for_segment_ex(
         }
     }
     Ok(SegmentSeats {
+        direction: sklad.direction,
+        schema: sklad.schema,
         rows,
         warnings: warnings.into_inner().unwrap_or_default(),
     })

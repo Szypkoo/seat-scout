@@ -1,0 +1,29 @@
+name: SeatScout
+options:
+  deploymentTarget:
+    iOS: '18.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    CODE_SIGNING_ALLOWED: 'NO'
+    INFOPLIST_KEY_CFBundleVersion: '1'
+    INFOPLIST_KEY_CFBundleShortVersionString: '1.0'
+targets:
+  SeatScout:
+    type: application
+    platform: iOS
+    sources: [Sources/SeatScout]
+    info:
+      path: Support/SeatScout-Info.plist
+      properties:
+        CFBundleDisplayName: Seat Scout
+        UILaunchScreen: {}
+        BGTaskSchedulerPermittedIdentifiers: [com.example.seatscout.refresh]
+        UIBackgroundModes: [fetch]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.seatscout
+        GENERATE_INFOPLIST_FILE: 'NO'
+        SWIFT_INCLUDE_PATHS: '$(SRCROOT)/Sources/CSeatScout/include'
+        LIBRARY_SEARCH_PATHS: '$(SRCROOT)/../core/dist/ios'
+        OTHER_LDFLAGS: ['$(inherited)', '-lseat_scout_core']

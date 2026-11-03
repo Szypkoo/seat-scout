@@ -5,3 +5,5 @@ dist/
 *.ipa
 __pycache__/
 app/xtool/
+app/.derived/
+app/*.xcodeproj/

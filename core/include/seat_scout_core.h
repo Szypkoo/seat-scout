@@ -125,6 +125,8 @@ typedef struct TcSeatReport TcSeatReport;
 
 TcSeatReport *tc_parse_wagon_svg(const char *svg, size_t len, int default_class,
                                  int exclude_special);
+int32_t tc_report_direction(const TcSeatReport *r);
+int32_t tc_report_compartments(const TcSeatReport *r, size_t index);
 size_t tc_report_count(const TcSeatReport *r);
 int tc_report_get(const TcSeatReport *r, size_t index, TcWagon *out);
 
@@ -257,6 +259,9 @@ TcPlan *tc_planner_solve(const TcPlanner *p, size_t board_stop, size_t alight_st
 
 TcPlan *tc_planner_solve_pairs(const TcPlanner *p, size_t board_stop, size_t alight_stop,
                                int32_t change_penalty_min);
+
+int tc_planner_solve_many(const TcPlanner *p, size_t board_stop, size_t alight_stop,
+                          int32_t change_penalty_min, size_t people, TcPlan **out);
 
 int tc_planner_solve_separate(const TcPlanner *p, size_t board_stop, size_t alight_stop,
                               int32_t change_penalty_min, TcPlan **out_a, TcPlan **out_b);

@@ -13,7 +13,6 @@ let package = Package(
     platforms: [.iOS(.v18)],
     products: [
         .library(name: "SeatScout", targets: ["SeatScout"]),
-        .library(name: "SeatScoutWidget", targets: ["SeatScoutWidget"]),
     ],
     targets: [
         .target(
@@ -24,8 +23,6 @@ let package = Package(
                 .linkedLibrary("seat_scout_core"),
             ]
         ),
-        .target(name: "SeatScoutShared"),
-        .target(name: "SeatScout", dependencies: ["CSeatScout", "SeatScoutShared"]),
-        .target(name: "SeatScoutWidget", dependencies: ["SeatScoutShared"]),
+        .target(name: "SeatScout", dependencies: ["CSeatScout"]),
     ]
 )
