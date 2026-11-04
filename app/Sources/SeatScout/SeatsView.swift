@@ -50,42 +50,80 @@ struct SeatsView: View {
 
 
     var body: some View {
-        NavigationStack {
-            List {
-                sourceSection
-                if sourceWagons.isEmpty {
+        List {
+            sourceSection
+            if sourceWagons.isEmpty {
+                if model.isLoadingDetails || model.isLoadingSegments {
                     Section {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text(model.isLive ? "Pobieram miejsca w wagonach…" : "Brak danych na żywo").foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                LoadingBar(width: 56, height: 48)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    } header: {
+                        Text("Wagon")
+                    }
+                    Section {
+                        ForEach(0..<2, id: \.self) { _ in
+                            HStack {
+                                LoadingBar(width: 125)
+                                Spacer()
+                                LoadingBar(width: 55)
+                            }
+                            .padding(.vertical, 2)
                         }
                     }
+                    Section {
+                        VStack(spacing: 12) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                HStack(spacing: 8) {
+                                    LoadingBar(width: 36, height: 36)
+                                    LoadingBar(width: 36, height: 36)
+                                    Spacer(minLength: 20)
+                                    LoadingBar(width: 36, height: 36)
+                                    LoadingBar(width: 36, height: 36)
+                                }
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: 250)
+                        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.secondary.opacity(0.2)))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Pobieram miejsca w wagonach")
+                    } header: {
+                        Text("Mapa wagonu")
+                    }
                 } else {
-                    wagonChips
-                    if let w = currentWagon {
-                        summarySection(w)
-                        mapSection(w)
-                        legendSection
+                    Section {
+                        Text(model.isLive ? "Brak danych o miejscach" : "Wybierz połączenie, aby zobaczyć miejsca")
+                            .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Fotele")
-            .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .top) { TrainPickerBar() }
-            .safeAreaInset(edge: .bottom) {
-                if let w = currentWagon, let n = selected, let seat = w.seats.first(where: { $0.number == n }) {
-                    SeatDetailPanel(wagon: w, seat: seat, onClose: { selected = nil })
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                wagonChips
+                if let w = currentWagon {
+                    summarySection(w)
+                    mapSection(w)
+                    legendSection
                 }
             }
-            .animation(.snappy, value: selected)
-            .task { await model.loadSegments() }
-            .onChange(of: model.currentTrain.id) { _, _ in
-                legChoice = nil; wagonChoice = nil; selected = nil
+        }
+        .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom) {
+            if let w = currentWagon, let n = selected, let seat = w.seats.first(where: { $0.number == n }) {
+                SeatDetailPanel(wagon: w, seat: seat, onClose: { selected = nil })
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        }
+        .animation(.snappy, value: selected)
+        .task { await model.loadSegments() }
+        .onChange(of: model.currentTrain.id) { _, _ in
+            legChoice = nil; wagonChoice = nil; selected = nil
         }
     }
 
@@ -167,21 +205,53 @@ struct SeatsView: View {
         }
     }
 
-    private func mapSection(_ w: CoreWagon) -> some View {
-        let lay = layout(for: w)
+    private func mapSection(_ wagon: CoreWagon) -> some View {
+        let wagonLayout = layout(for: wagon)
+        let compartments = wagon.compartments == 1 ? CompartmentLayout(seats: wagon.seats) : nil
         return Section {
-            VStack(spacing: 6) {
-                Text("początek wagonu").font(.caption2).foregroundStyle(.secondary)
-                WagonMapView(
-                    wagon: w, width: lay.width, height: lay.height, decor: lay.decor,
-                    selected: selected, planned: model.plannedSeats, mine: model.mySeat,
-                    onSelect: { selected = $0 == selected ? nil : $0 })
+            VStack(spacing: 10) {
+                if wagon.direction == 1 || wagon.direction == -1 {
+                    Text("Kierunek według Intercity")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(wagon.direction == 2 ? "Pociąg zmienia kierunek na trasie" : "Brak danych o kierunku jazdy")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text("koniec wagonu").font(.caption2).foregroundStyle(.secondary)
+                HStack(alignment: .center, spacing: 8) {
+                    directionArrow(wagon)
+                    WagonMapView(
+                        wagon: wagon, width: wagonLayout.width, height: wagonLayout.height,
+                        decor: wagonLayout.decor, compartments: compartments,
+                        selected: selected, planned: model.plannedSeats, mine: model.mySeat,
+                        onSelect: { selected = $0 == selected ? nil : $0 })
+                    directionArrow(wagon)
+                }
+                Text("początek wagonu").font(.caption2).foregroundStyle(.secondary)
+
+                if compartments != nil {
+                    Text("Podział orientacyjny według numerów i położenia miejsc. Sprawdź układ u przewoźnika.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
         } header: {
             Text("Mapa wagonu")
+        }
+    }
+
+    @ViewBuilder
+    private func directionArrow(_ wagon: CoreWagon) -> some View {
+        if wagon.direction == 1 || wagon.direction == -1 {
+            Image(systemName: wagon.direction == -1 ? "arrow.up" : "arrow.down")
+                .font(.system(size: 28, weight: .bold))
+                .frame(width: 28)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(wagon.direction == -1 ? "Kierunek jazdy w górę" : "Kierunek jazdy w dół")
         }
     }
 
@@ -229,6 +299,7 @@ private struct WagonMapView: View {
     let width: Int
     let height: Int
     let decor: [CoreDecor]
+    let compartments: CompartmentLayout?
     let selected: Int?
     let planned: Set<[Int]>
     let mine: AppModel.MySeat?
@@ -238,21 +309,88 @@ private struct WagonMapView: View {
     private let cell: CGFloat = 40
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        let toiletBlocks = mergedToiletBlocks
+        return ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color(.tertiarySystemFill).opacity(0.5))
                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.5))
 
-            ForEach(decor) { d in decorView(d) }
+            ForEach(compartments?.groups ?? []) { group in
+                let bounds = compartmentBounds(group)
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.secondary.opacity(0.7), lineWidth: 1)
+                    .frame(width: bounds.width - 2, height: bounds.height - 2)
+                    .position(x: bounds.midX, y: bounds.midY)
+                    .allowsHitTesting(false)
+            }
+
+            ForEach(toiletBlocks) { block in
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(width: block.bounds.height * scale - 4, height: block.bounds.width * scale - 4)
+                    .position(x: block.bounds.midY * scale, y: (CGFloat(width) - block.bounds.midX) * scale)
+            }
+            ForEach(decor) { item in
+                if !toiletBlocks.contains(where: { $0.members.contains(item.id) }) {
+                    decorView(item)
+                }
+            }
             ForEach(wagon.seats) { s in
                 if let xy = s.xy { seatView(s, xy: xy) }
+            }
+
+            ForEach(compartments?.groups ?? []) { group in
+                let bounds = compartmentBounds(group)
+                Text("Przedział \(group.id)")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 5)
+                    .background(.regularMaterial, in: Capsule())
+                    .position(x: bounds.midX, y: bounds.midY)
+                    .allowsHitTesting(false)
             }
         }
         .frame(width: CGFloat(height) * scale, height: CGFloat(width) * scale)
     }
 
+    private struct ToiletBlock: Identifiable {
+        let id: String
+        let bounds: CGRect
+        let members: Set<String>
+    }
+
+    private var mergedToiletBlocks: [ToiletBlock] {
+        decor.filter { $0.isSign && ($0.code == "401" || $0.title.localizedCaseInsensitiveContains("toalet")) }
+            .compactMap { toilet in
+                let toiletBounds = CGRect(x: toilet.x, y: toilet.y, width: toilet.w, height: toilet.h)
+                let pieces = decor.filter { item in
+                    guard !item.isSign else { return false }
+                    let bounds = CGRect(x: item.x, y: item.y, width: item.w, height: item.h)
+                    return bounds.intersects(toiletBounds)
+                }
+                guard pieces.count > 1 else { return nil }
+                let bounds = pieces.reduce(CGRect.null) { result, item in
+                    result.union(CGRect(x: item.x, y: item.y, width: item.w, height: item.h))
+                }
+                return ToiletBlock(id: toilet.id, bounds: bounds, members: Set(pieces.map(\.id)))
+            }
+    }
+
+    private func compartmentBounds(_ group: CompartmentLayout.Group) -> CGRect {
+        let positions = group.rows.flatMap { $0 }.compactMap(\.xy)
+        let minX = positions.map(\.x).min() ?? 0
+        let maxX = positions.map(\.x).max() ?? minX
+        let minY = positions.map(\.y).min() ?? 0
+        let maxY = positions.map(\.y).max() ?? minY
+        return CGRect(
+            x: CGFloat(minY) * scale, y: (CGFloat(width - maxX) - cell) * scale,
+            width: (CGFloat(maxY - minY) + cell) * scale,
+            height: (CGFloat(maxX - minX) + cell) * scale
+        )
+    }
+
     private func center(x: Int, y: Int, w: Int, h: Int) -> CGPoint {
-        CGPoint(x: (CGFloat(y) + CGFloat(h) / 2) * scale, y: (CGFloat(x) + CGFloat(w) / 2) * scale)
+        CGPoint(x: (CGFloat(y) + CGFloat(h) / 2) * scale, y: (CGFloat(width) - CGFloat(x) - CGFloat(w) / 2) * scale)
     }
 
     @ViewBuilder

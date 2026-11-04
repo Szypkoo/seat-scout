@@ -220,6 +220,29 @@ impl Planner {
         Some(plan)
     }
 
+    pub fn solve_many(
+        &self,
+        board: usize,
+        alight: usize,
+        change_penalty_min: i32,
+        people: usize,
+    ) -> Option<Vec<Plan>> {
+        let mut planner = self.clone();
+        let mut plans = Vec::with_capacity(people);
+        for _ in 0..people {
+            let plan = planner.solve(board, alight, change_penalty_min)?;
+            for run in &plan.runs {
+                if let Some(info) = run.seat.and_then(|seat| planner.seats.get_mut(&seat)) {
+                    for leg in run.from_stop..run.to_stop {
+                        info.mask[leg] = false;
+                    }
+                }
+            }
+            plans.push(plan);
+        }
+        Some(plans)
+    }
+
     pub fn solve_separate(
         &self,
         board: usize,

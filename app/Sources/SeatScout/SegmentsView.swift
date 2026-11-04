@@ -5,119 +5,104 @@ struct SegmentsView: View {
     @ObservedObject private var reminders = ReminderService.shared
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Text("Wolne miejsca (klasa 2) na kolejnych odcinkach trasy \(model.currentTrain.number). Kupujesz jeden bilet bez miejscówki i siadasz na wolnych fotelach. Aplikacja Intercity szuka fotela wolnego na całej trasie – tu składamy przejazd z foteli wolnych tylko na części trasy.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if model.isLoadingSegments {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                            Text(model.segmentsProgress).font(.footnote).foregroundStyle(.secondary)
-                        }
+        List {
+            Section {
+                Text("Zobacz wolne miejsca w klasie 2 na kolejnych odcinkach trasy. Plan pokaże Ci, gdzie możesz usiąść i kiedy zmienić miejsce.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if model.isLoadingSegments {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(model.segmentsProgress).font(.footnote).foregroundStyle(.secondary)
                     }
-                    if let age = model.planDataAge {
-                        Label {
-                            Text("Dane z \(age.formatted(date: .omitted, time: .shortened)) (\(Self.ago(age)))"
-                                 + (model.isLoadingSegments ? " – odświeżam w tle" : ""))
-                                .font(.footnote)
-                        } icon: {
-                            Image(systemName: "clock.arrow.circlepath")
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                    if model.failedLegs > 0 {
-                        Label("Nie udało się pobrać \(model.failedLegs) odcinków – plan może być niepełny.",
-                              systemImage: "exclamationmark.triangle.fill")
+                }
+                if let age = model.planDataAge {
+                    Label {
+                        Text("Dane z \(age.formatted(date: .omitted, time: .shortened)) (\(Self.ago(age)))"
+                             + (model.isLoadingSegments ? " – odświeżam w tle" : ""))
                             .font(.footnote)
-                            .foregroundStyle(.orange)
+                    } icon: {
+                        Image(systemName: "clock.arrow.circlepath")
                     }
+                    .foregroundStyle(.secondary)
                 }
-
-                if model.planStops.count >= 2 {
-                    rangeSection
-                    travelersSection
-                }
-
-                if let plan = model.balancedPlan {
-                    let separate = model.planPeople == 2 && !model.planTogether
-                    let together = model.planPeople == 2 && model.planTogether
-                    planSection(separate ? "Osoba 1" : (together ? "Najlepszy plan (razem)" : "Najlepszy plan"), plan: plan)
-                    if let second = model.secondPersonPlan {
-                        planSection("Osoba 2", plan: second)
-                    }
-                    if let single = model.singleSeatPlan, single.seatedMinutes != plan.seatedMinutes {
-                        planSection(together ? "Bez zmiany miejsc (razem)" : "Bez zmiany miejsca", plan: single)
-                    }
-                    remindersSection
-                    Section {
-                        LabeledContent(model.planPeople == 2 && model.planTogether ? "Pary obok siebie wolne na całej trasie" : "Miejsca wolne na całej trasie") {
-                            Text("\(plan.fullRideSeats)")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(plan.fullRideSeats > 0 ? .green : .orange)
-                        }
-                    } footer: {
-                        Text(plan.fullRideSeats > 0
-                             ? "Tyle foteli znajdzie oficjalna aplikacja przy rezerwacji miejsca na cały przejazd."
-                             : "Oficjalna aplikacja nie znajdzie fotela na całą trasę – stąd plan ze zmianami miejsc między wolnymi fotelami.")
-                    }
-                }
-
-                if model.balancedPlan != nil {
-                    Section {
-                        Text("Wolne dziś fotele mogą zostać zarezerwowane przez innych przed odjazdem – odśwież plan tuż przed podróżą i w trakcie jazdy.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if model.segmentsData.contains(where: { !$0.wagons.isEmpty }) {
-                    WagonMatrixSection()
-                }
-
-                Section("Pododcinki") {
-                    ForEach(model.segmentsData) { seg in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("\(seg.from) → \(seg.to)")
-                                    .font(.subheadline.weight(.semibold))
-                                Spacer()
-                                Text("\(seg.freeSeats) wolnych")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(seg.freeSeats > 25 ? .green : .orange)
-                            }
-                            Text("\(seg.legIndex >= 0 ? "\(seg.legIndex + 1). " : "")\(seg.depTime) – \(seg.arrTime)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            if !seg.wagons.isEmpty {
-                                Text(seg.wagons.map { "w\($0.wagon): \($0.free)" }.joined(separator: "  "))
-                                    .font(.caption2.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            }
-                            ProgressView(value: Double(seg.occupancyPercent), total: 100)
-                                .tint(seg.occupancyPercent > 60 ? .orange : .blue)
-                        }
-                        .padding(.vertical, 4)
-                    }
+                if model.failedLegs > 0 {
+                    Label("Nie udało się pobrać \(model.failedLegs) odcinków – plan może być niepełny.",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
                 }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Plan miejsc")
-            .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .top) { TrainPickerBar() }
-            .task(id: model.currentTrain.id) { await model.loadSegments() }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await model.refreshSegments() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+
+            if model.planStops.count >= 2 {
+                rangeSection
+                travelersSection
+            }
+
+            if let plan = model.balancedPlan {
+                let separate = model.planPeople > 2 || (model.planPeople == 2 && !model.planTogether)
+                let together = model.planPeople == 2 && model.planTogether
+                planSection(separate ? "Osoba 1" : (together ? "Najlepszy plan (razem)" : "Najlepszy plan"), plan: plan)
+                ForEach(Array(model.additionalPlans.enumerated()), id: \.offset) { index, personPlan in
+                    planSection("Osoba \(index + 2)", plan: personPlan)
+                }
+                if let single = model.singleSeatPlan, single.seatedMinutes != plan.seatedMinutes {
+                    planSection(together ? "Bez zmiany miejsc (razem)" : "Bez zmiany miejsca", plan: single)
+                }
+                remindersSection
+                Section {
+                    LabeledContent(model.planPeople == 2 && model.planTogether ? "Pary obok siebie wolne na całej trasie" : "Miejsca wolne na całej trasie") {
+                        Text("\(plan.fullRideSeats)")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(plan.fullRideSeats > 0 ? .green : .orange)
                     }
-                    .disabled(model.isLoadingSegments)
+                } footer: {
+                    Text(plan.fullRideSeats > 0
+                         ? "Tyle foteli znajdzie oficjalna aplikacja przy rezerwacji miejsca na cały przejazd."
+                         : "Oficjalna aplikacja nie znajdzie fotela na całą trasę – stąd plan ze zmianami miejsc między wolnymi fotelami.")
+                }
+            }
+
+            if model.balancedPlan != nil {
+                Section {
+                    Text("Wolne dziś fotele mogą zostać zarezerwowane przez innych przed odjazdem – odśwież plan tuż przed podróżą i w trakcie jazdy.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if model.segmentsData.contains(where: { !$0.wagons.isEmpty }) {
+                WagonMatrixSection()
+            }
+
+            Section("Pododcinki") {
+                ForEach(model.segmentsData) { seg in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("\(seg.from) → \(seg.to)")
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text("\(seg.freeSeats) wolnych")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(seg.freeSeats > 25 ? .green : .orange)
+                        }
+                        Text("\(seg.legIndex >= 0 ? "\(seg.legIndex + 1). " : "")\(seg.depTime) – \(seg.arrTime)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if !seg.wagons.isEmpty {
+                            Text(seg.wagons.map { "w\($0.wagon): \($0.free)" }.joined(separator: "  "))
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        ProgressView(value: Double(seg.occupancyPercent), total: 100)
+                            .tint(seg.occupancyPercent > 60 ? .orange : .blue)
+                    }
+                    .padding(.vertical, 4)
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .task(id: model.currentTrain.id) { await model.loadSegments() }
     }
 
     private static func ago(_ date: Date) -> String {
@@ -180,10 +165,11 @@ struct SegmentsView: View {
     private var travelersSection: some View {
         Section {
             Picker("Podróżni", selection: Binding(get: { model.planPeople }, set: { model.setPlanPeople($0) })) {
-                Text("1 osoba").tag(1)
-                Text("2 osoby").tag(2)
+                ForEach(1...6, id: \.self) { count in
+                    Text(count == 1 ? "1 osoba" : (count < 5 ? "\(count) osoby" : "\(count) osób")).tag(count)
+                }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             if model.planPeople == 2 {
                 Toggle("Siedzimy obok siebie", isOn: Binding(get: { model.planTogether }, set: { model.setPlanTogether($0) }))
             }
@@ -191,7 +177,9 @@ struct SegmentsView: View {
             if model.planPeople == 2 {
                 Text(model.planTogether
                      ? "Szukamy par sąsiednich foteli (obok siebie lub naprzeciw) wolnych na tych samych odcinkach i przesiadamy się razem."
-                     : "Każda osoba dostaje własny plan; drugi plan nie używa foteli pierwszego.")
+                     : "Każda osoba dostaje własny plan bez powtarzania miejsc na tym samym odcinku.")
+            } else if model.planPeople > 2 {
+                Text("Każda osoba dostaje własny plan bez powtarzania miejsc na tym samym odcinku. Miejsca nie muszą być obok siebie.")
             }
         }
     }
@@ -289,8 +277,10 @@ private struct WagonMatrixSection: View {
 
     private var planned: Set<[Int]> {
         var out = Set<[Int]>()
-        for r in model.balancedPlan?.runs ?? [] where r.seat != nil {
-            for leg in r.fromStop..<r.toStop { out.insert([r.wagon, leg]) }
+        for plan in [model.balancedPlan].compactMap({ $0 }) + model.additionalPlans {
+            for r in plan.runs where r.seat != nil {
+                for leg in r.fromStop..<r.toStop { out.insert([r.wagon, leg]) }
+            }
         }
         return out
     }

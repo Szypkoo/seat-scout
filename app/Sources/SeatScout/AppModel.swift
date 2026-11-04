@@ -1,4 +1,3 @@
-import SeatScoutShared
 import SwiftUI
 #if canImport(UIKit)
 import UIKit
@@ -7,12 +6,13 @@ import UIKit
 @MainActor
 final class AppModel: ObservableObject {
     @Published var selectedTab: AppTab = .live
-    @Published var remainingSeconds: Int = 16892
+    @Published var remainingSeconds: Int = 0
     @Published var selectedDiscountIndex: Int = 1 { didSet { savePrefs() } }
     @Published var selectedTrainIndex: Int = 0
     @Published var toastMessage: String?
     @Published var isLive: Bool = false
     @Published var isLoading: Bool = false
+    @Published private(set) var isLoadingDetails = false
 
     @Published var showSearch = false
     @Published var isSearching = false
@@ -26,7 +26,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var planAlight = 0
     @Published private(set) var balancedPlan: SeatPlan?
     @Published private(set) var singleSeatPlan: SeatPlan?
-    @Published private(set) var secondPersonPlan: SeatPlan?
+    @Published private(set) var additionalPlans: [SeatPlan] = []
     @Published private(set) var planPeople = 1
     @Published private(set) var planTogether = true
     @Published private(set) var failedLegs = 0
@@ -54,7 +54,7 @@ final class AppModel: ObservableObject {
         p.prune(now: Date(), timeZone: Self.warsaw)
         prefs = p
         if let d = p.discountIndex, discounts.indices.contains(d) { selectedDiscountIndex = d }
-        if let n = p.planPeople, (1...2).contains(n) { planPeople = n }
+        if let n = p.planPeople, (1...6).contains(n) { planPeople = n }
         if let t = p.planTogether { planTogether = t }
         PrefsStore.save(p)
     }
@@ -98,48 +98,9 @@ final class AppModel: ObservableObject {
     private var coreTrains: [String: CoreTrain] = [:]
     private var departureDate: Date?
     private var detailsToken = 0
+    private var planToken = 0
 
-    @Published var trains: [TrainInfo] = [
-        TrainInfo(
-            id: "4510",
-            number: "IC 4510",
-            name: "Heweliusz",
-            fromStation: "Bielsko-Biała Gł.",
-            departureTime: "05:48",
-            toStation: "Poznań Gł.",
-            arrivalTime: "10:29",
-            duration: "4h 41min",
-            basePrice: 75.00,
-            wagonNumber: 14,
-            freeSeatsCount: 28
-        ),
-        TrainInfo(
-            id: "1410",
-            number: "IC 1410",
-            name: "Klimczok",
-            fromStation: "Katowice",
-            departureTime: "06:12",
-            toStation: "Warszawa Wsch.",
-            arrivalTime: "09:34",
-            duration: "3h 22min",
-            basePrice: 68.00,
-            wagonNumber: 14,
-            freeSeatsCount: 19
-        ),
-        TrainInfo(
-            id: "38100",
-            number: "TLK 38100",
-            name: "Lubomirski",
-            fromStation: "Kraków Gł.",
-            departureTime: "06:15",
-            toStation: "Kołobrzeg",
-            arrivalTime: "16:42",
-            duration: "10h 27min",
-            basePrice: 90.00,
-            wagonNumber: 14,
-            freeSeatsCount: 34
-        )
-    ]
+    @Published var trains: [TrainInfo] = []
 
     let discounts: [DiscountOption] = [
         DiscountOption(name: "37% Szkoła", discountPercent: 37, badgeText: "Ulga 37% (uczniowska)"),
@@ -147,14 +108,7 @@ final class AppModel: ObservableObject {
         DiscountOption(name: "Normalny", discountPercent: 0, badgeText: "Bilet normalny 100%")
     ]
 
-    @Published var segmentsData: [SegmentItem] = [
-        SegmentItem(from: "Bielsko-Biała Gł.", to: "Katowice", depTime: "05:48", arrTime: "06:42", freeSeats: 48, occupancyPercent: 32),
-        SegmentItem(from: "Katowice", to: "Sosnowiec Gł.", depTime: "06:45", arrTime: "06:58", freeSeats: 42, occupancyPercent: 41),
-        SegmentItem(from: "Sosnowiec Gł.", to: "Zawiercie", depTime: "07:00", arrTime: "07:22", freeSeats: 39, occupancyPercent: 45),
-        SegmentItem(from: "Zawiercie", to: "Częstochowa", depTime: "07:24", arrTime: "07:54", freeSeats: 31, occupancyPercent: 57),
-        SegmentItem(from: "Częstochowa", to: "Kalisz", depTime: "07:56", arrTime: "09:12", freeSeats: 24, occupancyPercent: 67),
-        SegmentItem(from: "Kalisz", to: "Poznań Gł.", depTime: "09:14", arrTime: "10:29", freeSeats: 18, occupancyPercent: 75)
-    ]
+    @Published var segmentsData: [SegmentItem] = []
 
     @Published private(set) var detailWagons: [CoreWagon] = []
     @Published var mySeat: MySeat?
@@ -165,7 +119,11 @@ final class AppModel: ObservableObject {
     }
 
     var currentTrain: TrainInfo {
-        trains[min(selectedTrainIndex, trains.count - 1)]
+        guard trains.indices.contains(selectedTrainIndex) else {
+            return TrainInfo(id: "", number: "", name: "", fromStation: "", departureTime: "", toStation: "",
+                             arrivalTime: "", duration: "", basePrice: 0, wagonNumber: 0, freeSeatsCount: 0)
+        }
+        return trains[selectedTrainIndex]
     }
 
     var currentDiscount: DiscountOption {
@@ -181,6 +139,8 @@ final class AppModel: ObservableObject {
         max(0, (ticketPrices[0] ?? currentTrain.basePrice) - calculatedPrice)
     }
 
+    var hasDepartureTime: Bool { departureDate != nil }
+
     var formattedCountdown: String {
         let h = remainingSeconds / 3600
         let m = (remainingSeconds % 3600) / 60
@@ -192,12 +152,18 @@ final class AppModel: ObservableObject {
         updateTrip()
         if let departureDate {
             remainingSeconds = max(0, Int(departureDate.timeIntervalSinceNow))
-        } else if remainingSeconds > 0 {
-            remainingSeconds -= 1
+        } else {
+            remainingSeconds = 0
         }
     }
 
     func selectTrain(_ index: Int) {
+        if selectedTrainIndex != index {
+            detailWagons = []
+            ticketPrices = [:]
+            priceNote = nil
+            departureDate = nil
+        }
         selectedTrainIndex = index
         triggerHaptic()
         showToast("Wybrano: \(trains[index].number) \(trains[index].name)")
@@ -230,8 +196,8 @@ final class AppModel: ObservableObject {
 
     var plannedSeats: Set<[Int]> {
         var out = Set<[Int]>()
-        for plan in [balancedPlan, secondPersonPlan] {
-            for r in plan?.runs ?? [] {
+        for plan in [balancedPlan].compactMap({ $0 }) + additionalPlans {
+            for r in plan.runs {
                 if let s = r.seat { out.insert([r.wagon, s]) }
                 if let s = r.seat2 { out.insert([r.wagon, s]) }
             }
@@ -369,6 +335,7 @@ final class AppModel: ObservableObject {
                 showToast("Brak bezpośrednich połączeń \(from.name) → \(to.name)")
                 return false
             }
+            detailWagons = []
             coreTrains = Dictionary(found.map { (String($0.number), $0) }, uniquingKeysWith: { a, _ in a })
             trains = found.map { Self.trainInfo($0, from: from, to: to, price: 0, wagon: 0, free: 0) }
             selectedTrainIndex = 0
@@ -386,6 +353,12 @@ final class AppModel: ObservableObject {
 
     func pickSearchResult(_ index: Int) {
         guard trains.indices.contains(index) else { return }
+        if selectedTrainIndex != index {
+            detailWagons = []
+            ticketPrices = [:]
+            priceNote = nil
+            departureDate = nil
+        }
         selectedTrainIndex = index
         showSearch = false
         selectedTab = .live
@@ -410,6 +383,8 @@ final class AppModel: ObservableObject {
               let core = coreTrains[currentTrain.id] else { return }
         detailsToken += 1
         let token = detailsToken
+        isLoadingDetails = true
+        defer { if token == detailsToken { isLoadingDetails = false } }
         departureDate = Self.format("yyyy-MM-dd HH:mm:ss").date(from: core.departure)
         tick()
         log(.info, "app", "szczegóły: \(core.category) \(core.number) \(core.name)")
@@ -422,7 +397,7 @@ final class AppModel: ObservableObject {
             applyDetails(core: core, from: from, to: to, wagons: c.wagons.map(\.core), prices: prices, note: c.priceNote)
             let age = Int(Date().timeIntervalSince(c.savedAt))
             log(.info, "app", "szczegóły z dysku (sprzed \(age) s)")
-            if age < 120 { return }
+            if age < 120 && c.wagons.allSatisfy({ $0.direction != nil && $0.compartments != nil }) { return }
         } else {
             ticketPrices = [:]
             priceNote = nil
@@ -584,8 +559,9 @@ final class AppModel: ObservableObject {
         segmentsFor = trainId
 
         if !sameTrain {
+            planToken += 1
             segmentsData = []; planStops = []; planner = nil; legsData = [:]
-            balancedPlan = nil; singleSeatPlan = nil; secondPersonPlan = nil
+            balancedPlan = nil; singleSeatPlan = nil; additionalPlans = []
             failedLegs = 0; planDataAge = nil
         }
         isLoadingSegments = true
@@ -600,7 +576,7 @@ final class AppModel: ObservableObject {
             applyPlanData(stops: stops, legs: legs, from: from, to: to, resetRange: true)
             planDataAge = snap.savedAt
             log(.info, "plan", "z dysku: \(legs.count) odcinków sprzed \(Int(Date().timeIntervalSince(snap.savedAt))) s")
-            if Date().timeIntervalSince(snap.savedAt) < 240 {
+            if Date().timeIntervalSince(snap.savedAt) < 240 && snap.legs.values.flatMap({ $0 }).allSatisfy({ $0.direction != nil && $0.compartments != nil }) {
                 isLoadingSegments = false
                 segmentsProgress = ""
                 return
@@ -697,6 +673,11 @@ final class AppModel: ObservableObject {
     }
 
 
+    var trackingKey: String {
+        let train = coreTrains[currentTrain.id]
+        return "\(currentTrain.id)-\(train?.departure ?? "")-\(fromStation?.eva ?? 0)-\(toStation?.eva ?? 0)"
+    }
+
     nonisolated private static func nowMinutes() -> Int64? {
         coreCompactMinutes(format("yyyyMMddHHmm").string(from: Date()))
     }
@@ -704,11 +685,11 @@ final class AppModel: ObservableObject {
     @discardableResult
     func refreshTrip() async -> Bool {
         guard let client, let from = fromStation, let to = toStation, let core = coreTrains[currentTrain.id] else { return false }
-        let id = currentTrain.id
+        let key = trackingKey
         do {
             let t0 = Date()
             let route = try await Task.detached { try client.routeHandle(train: core, from: from, to: to) }.value
-            guard id == currentTrain.id else { return false }
+            guard !Task.isCancelled, key == trackingKey else { return false }
             tripRoute = route
             tripStops = route.stops
             tripUpdated = Date()
@@ -724,6 +705,7 @@ final class AppModel: ObservableObject {
                 + (trip.map { ", opóźnienie: \($0.delay.map { "\($0) min" } ?? "brak danych")" } ?? ""))
             return true
         } catch {
+            guard !Task.isCancelled, key == trackingKey else { return false }
             tripError = Self.describe(error)
             log(.warn, "trip", "śledzenie: \(Self.describe(error))")
             return false
@@ -769,8 +751,7 @@ final class AppModel: ObservableObject {
             showToast("Najpierw poczekaj na plan miejsc")
             return
         }
-        var people = [planSteps(plan)]
-        if planPeople == 2, !planTogether, let second = secondPersonPlan { people.append(planSteps(second)) }
+        let people = ([plan] + additionalPlans).map(planSteps)
         let committed = CommittedPlan(trainKey: key, label: "\(currentTrain.number) \(currentTrain.name)", people: people)
         let t = reminderTimes()
         if await ReminderService.shared.commit(committed, arr: t.arr, dep: t.dep) {
@@ -785,58 +766,17 @@ final class AppModel: ObservableObject {
         if let old = trip, old.state == t.state, old.minutesToNext == t.minutesToNext, old.delay == t.delay, old.isActual == t.isActual,
            old.stops.map(\.arr) == t.stops.map(\.arr) { return }
         trip = t
-        updateLiveActivity()
-    }
-
-    func activityState() -> TrainActivityAttributes.ContentState? {
-        guard let t = trip, !tripStops.isEmpty, t.stops.count == tripStops.count else { return nil }
-        let warsaw = Self.warsaw
-        func date(_ m: Int64) -> Date { ReminderPlanner.date(fromLocalMinutes: m, timeZone: warsaw) }
-        let phase: String, headline: String, stop: String, when: Date?
-        switch t.state {
-        case .notStarted:
-            phase = "before"; stop = tripStops[0].name; headline = "Odjazd z \(stop)"; when = date(t.stops[0].dep)
-        case .atStation(let i):
-            phase = "station"; stop = tripStops[i].name; headline = "Stoi: \(stop)"; when = date(t.stops[i].dep)
-        case .between(_, let b):
-            phase = "moving"; stop = tripStops[b].name; headline = "Jedzie do \(stop)"; when = date(t.stops[b].arr)
-        case .finished:
-            phase = "finished"; stop = tripStops[tripStops.count - 1].name; headline = "Dojechał: \(stop)"; when = nil
-        }
-        let next = ReminderService.shared.scheduled.first { $0.fireDate > Date() }
-        let seat = mySeat.map { "wagon \($0.wagon) · miejsce \($0.number)" }
-        let change = next.flatMap { r -> String? in
-            guard r.id.hasPrefix("seat-1-") else { return nil }
-            return r.title.replacingOccurrences(of: #"^Za \d+ min "#, with: "", options: .regularExpression) + ": " + r.body.replacingOccurrences(of: "\n", with: " · ")
-        }
-        return TrainActivityAttributes.ContentState(
-            phase: phase, headline: headline, nextStop: stop, nextDate: when, delayMinutes: t.delay,
-            seatText: seat, changeText: change, changeDate: change != nil ? next?.fireDate : nil, progress: t.progress)
-    }
-
-    func updateLiveActivity() {
-        guard LiveActivityService.shared.isRunning, let s = activityState() else { return }
-        LiveActivityService.shared.update(s)
-    }
-
-    func setLiveActivity(_ on: Bool) async {
-        if !on {
-            await LiveActivityService.shared.end()
-            return
-        }
-        if trip == nil { await refreshTrip() }
-        guard let s = activityState(), let target = currentWatchTarget() else {
-            showToast("Poczekaj, aż pojawi się pozycja pociągu")
-            return
-        }
-        LiveActivityService.shared.start(label: target.label, route: target.route, state: s)
-        if let err = LiveActivityService.shared.lastError { showToast(err) }
     }
 
     func trackingLoop() async {
+        tripRoute = nil
+        trip = nil
+        tripStops = []
+        tripUpdated = nil
+        tripError = nil
         while !Task.isCancelled {
             let ok = await refreshTrip()
-            var wait: Duration = ok ? .seconds(300) : .seconds(3)
+            var wait: Duration = ok ? .seconds(300) : .seconds(30)
             if ok, let t = trip, let first = t.stops.first, let last = t.stops.last, let now = Self.nowMinutes(),
                now >= first.schedDep - 90, now <= last.arr + 20 {
                 wait = .seconds(45)
@@ -878,7 +818,7 @@ final class AppModel: ObservableObject {
     }
 
     func setPlanPeople(_ n: Int) {
-        planPeople = n
+        planPeople = min(max(n, 1), 6)
         savePrefs()
         recomputePlans()
     }
@@ -890,32 +830,43 @@ final class AppModel: ObservableObject {
     }
 
     private func recomputePlans() {
+        planToken += 1
+        let token = planToken
         guard let planner, planAlight > planBoard else {
             balancedPlan = nil
             singleSeatPlan = nil
-            secondPersonPlan = nil
+            additionalPlans = []
             return
         }
         let (b, a, people, together) = (planBoard, planAlight, planPeople, planTogether)
+        balancedPlan = nil
+        singleSeatPlan = nil
+        additionalPlans = []
         Task {
-            struct Result: Sendable { var main: SeatPlan?; var single: SeatPlan?; var second: SeatPlan? }
+            struct Result: Sendable { var main: SeatPlan?; var single: SeatPlan?; var others: [SeatPlan] = [] }
             let r: Result = await Task.detached {
                 if people == 1 {
                     return Result(main: planner.solve(board: b, alight: a, changePenaltyMinutes: 10),
                                   single: planner.solve(board: b, alight: a, changePenaltyMinutes: 100_000))
-                } else if together {
+                }
+                if people == 2 && together {
                     return Result(main: planner.solvePairs(board: b, alight: a, changePenaltyMinutes: 10),
                                   single: planner.solvePairs(board: b, alight: a, changePenaltyMinutes: 100_000))
-                } else if let (p1, p2) = planner.solveSeparate(board: b, alight: a, changePenaltyMinutes: 10) {
-                    return Result(main: p1, single: nil, second: p2)
                 }
-                return Result()
+                guard let plans = planner.solveMany(board: b, alight: a, changePenaltyMinutes: 10, people: people) else { return Result() }
+                return Result(main: plans.first, others: Array(plans.dropFirst()))
             }.value
-            guard b == planBoard, a == planAlight, people == planPeople, together == planTogether else { return }
+            guard token == planToken, b == planBoard, a == planAlight, people == planPeople, together == planTogether else { return }
             balancedPlan = r.main
             singleSeatPlan = r.single
-            secondPersonPlan = r.second
-            log(.info, "plan", "plan (\(people) os.\(people == 2 ? (together ? ", razem" : ", osobno") : "")): siedzenie \(r.main?.seatedPercent ?? -1)%\(r.second.map { " / \($0.seatedPercent)%" } ?? ""), przesiadki \(r.main?.changes ?? -1), miejsca na całą trasę \(r.main?.fullRideSeats ?? -1)")
+            additionalPlans = r.others
+            if remindersActive, let plan = r.main, let key = seatKey {
+                let steps = ([plan] + r.others).map(planSteps)
+                let committed = CommittedPlan(trainKey: key, label: "\(currentTrain.number) \(currentTrain.name)", people: steps)
+                let times = reminderTimes()
+                _ = await ReminderService.shared.commit(committed, arr: times.arr, dep: times.dep)
+            }
+            log(.info, "plan", "plan dla \(people) osób: \(r.main == nil ? 0 : 1 + r.others.count) planów miejsc")
         }
     }
 

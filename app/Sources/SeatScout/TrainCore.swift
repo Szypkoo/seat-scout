@@ -49,6 +49,8 @@ struct CoreWagon: Identifiable, Sendable {
     var width: Int = 0
     var height: Int = 0
     var decor: [CoreDecor] = []
+    var direction: Int = 0
+    var compartments: Int = -1
     var id: String { "\(wagon)-\(travelClass)" }
 }
 
@@ -232,6 +234,14 @@ final class SeatPlanner: @unchecked Sendable {
         return Self.convert(plan)
     }
 
+    func solveMany(board: Int, alight: Int, changePenaltyMinutes: Int, people: Int) -> [SeatPlan]? {
+        var handles = [OpaquePointer?](repeating: nil, count: people)
+        guard tc_planner_solve_many(handle, board, alight, Int32(changePenaltyMinutes), people, &handles) == 0 else { return nil }
+        defer { for handle in handles { if let handle { tc_plan_free(handle) } } }
+        let plans = handles.compactMap { $0.flatMap(Self.convert) }
+        return plans.count == people ? plans : nil
+    }
+
     func solveSeparate(board: Int, alight: Int, changePenaltyMinutes: Int) -> (SeatPlan, SeatPlan)? {
         var pa: OpaquePointer?, pb: OpaquePointer?
         guard tc_planner_solve_separate(handle, board, alight, Int32(changePenaltyMinutes), &pa, &pb) == 0,
@@ -377,7 +387,8 @@ final class TrainCoreClient: @unchecked Sendable {
             return CoreWagon(
                 wagon: Int(w.wagon), travelClass: Int(w.klasa),
                 freeCount: Int(w.free_count), occupiedCount: Int(w.occupied_count), seats: seats,
-                width: Int(w.width), height: Int(w.height), decor: decor)
+                width: Int(w.width), height: Int(w.height), decor: decor, direction: Int(tc_report_direction(report)),
+                compartments: Int(tc_report_compartments(report, i)))
         }
     }
 

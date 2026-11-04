@@ -12,19 +12,14 @@ struct SavedView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                alertSection
-                if alerts.settings.enabled { optionsSection }
-                testSection
-                historySection
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Śledzone")
-            .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .top) { TrainPickerBar() }
-            .task { await alerts.refreshPermission() }
+        List {
+            alertSection
+            if alerts.settings.enabled { optionsSection }
+            permissionSection
+            historySection
         }
+        .listStyle(.insetGrouped)
+        .task { await alerts.refreshPermission() }
     }
 
 
@@ -84,17 +79,8 @@ struct SavedView: View {
         }
     }
 
-    private var testSection: some View {
+    private var permissionSection: some View {
         Section {
-            Button("Powiadomienie testowe za 1 minutę") {
-                Task { await alerts.scheduleTestNotification() }
-            }
-            if let at = alerts.testAt, at > Date() {
-                Label("Zaplanowano na \(at.formatted(date: .omitted, time: .standard)) – możesz zamknąć aplikację",
-                      systemImage: "bell.badge")
-                    .font(.footnote)
-                    .foregroundStyle(.green)
-            }
             LabeledContent("Zgoda na powiadomienia") {
                 Text(permissionText).foregroundStyle(permissionColor)
             }
@@ -104,7 +90,7 @@ struct SavedView: View {
                 }
             }
         } header: {
-            Text("Test")
+            Text("Powiadomienia")
         }
     }
 
