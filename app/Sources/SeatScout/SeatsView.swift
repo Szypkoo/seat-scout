@@ -23,12 +23,22 @@ struct SeatsView: View {
     private func total(_ w: CoreWagon) -> Int { w.seats.filter { !$0.isSpecial }.count }
 
     private func layout(for w: CoreWagon) -> (width: Int, height: Int, decor: [CoreDecor]) {
-        if let d = model.detailWagons.first(where: { $0.wagon == w.wagon }), d.width > 0 {
-            return (d.width, max(d.height, 200), d.decor)
-        }
-        if w.width > 0 { return (w.width, max(w.height, 200), w.decor) }
-        let maxX = w.seats.compactMap { $0.xy?.x }.max() ?? 1000
-        return (maxX + 120, 200, [])
+        let sourceDecor = model.detailWagons.first(where: { $0.wagon == w.wagon })?.decor ?? w.decor
+        let baseW = model.detailWagons.first(where: { $0.wagon == w.wagon })?.width ?? w.width
+        let baseH = model.detailWagons.first(where: { $0.wagon == w.wagon })?.height ?? w.height
+
+        let seatsMaxX = w.seats.compactMap { $0.xy?.x }.max() ?? 0
+        let seatsMaxY = w.seats.compactMap { $0.xy?.y }.max() ?? 0
+        let decorMaxX = sourceDecor.map { $0.x + $0.w }.max() ?? 0
+        let decorMaxY = sourceDecor.map { $0.y + $0.h }.max() ?? 0
+
+        let minW = max(seatsMaxX + 56, decorMaxX + 24)
+        let minH = max(seatsMaxY + 52, decorMaxY + 16)
+
+        let finalW = max(baseW > 0 ? baseW : 760, minW)
+        let finalH = max(max(baseH, 200), minH)
+
+        return (finalW, finalH, sourceDecor)
     }
 
     private func adjacentPairs(_ w: CoreWagon) -> Int {
@@ -190,14 +200,16 @@ struct SeatsView: View {
             selected = nil
         } label: {
             VStack(spacing: 2) {
-                Text("W\(w.wagon)").font(.subheadline.weight(.bold))
+                Text("W\(w.wagon)").font(.subheadline.weight(.bold)).lineLimit(1)
                 #if !SKIP
                 Text("\(count)")
                     .font(.caption.monospacedDigit().weight(.semibold))
+                    .lineLimit(1)
                     .foregroundStyle(countColor)
                 #else
                 Text("\(count)")
                     .font(.caption.weight(.semibold))
+                    .lineLimit(1)
                     .foregroundStyle(countColor)
                 #endif
             }
@@ -328,7 +340,7 @@ private struct WagonMapView: View {
     let onSelect: (Int) -> Void
 
     private let scale: CGFloat = 1.25
-    private let cell: CGFloat = 40
+    private let cell: CGFloat = 36
 
     var body: some View {
         let toiletBlocks = mergedToiletBlocks
@@ -364,9 +376,11 @@ private struct WagonMapView: View {
             ForEach(compartments?.groups ?? []) { group in
                 let bounds = compartmentBounds(group)
                 Text("Przedział \(group.id)")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 8, weight: .bold))
+                    .lineLimit(1)
                     .foregroundStyle(.primary)
-                    .padding(.horizontal, 5)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
                     .background(Color.secondary.opacity(0.15), in: Capsule())
                     .position(x: bounds.midX, y: bounds.midY)
                     .allowsHitTesting(false)
@@ -460,13 +474,18 @@ private struct WagonMapView: View {
                 if s.isSpecial {
                     Image(systemName: "figure.roll").font(.system(size: side * 0.42)).foregroundStyle(.orange)
                 } else {
+                    let fontSize: CGFloat = s.number >= 100 ? 11.0 : (s.number >= 10 ? 13.0 : 15.0)
                     #if !SKIP
                     Text("\(s.number)")
-                        .font(.system(size: side * 0.34, weight: .semibold).monospacedDigit())
+                        .font(.system(size: fontSize, weight: .semibold).monospacedDigit())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .foregroundStyle(isSel ? .white : (usable ? .primary : .secondary))
                     #else
                     Text("\(s.number)")
-                        .font(.system(size: side * 0.34, weight: .semibold))
+                        .font(.system(size: fontSize, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .foregroundStyle(isSel ? .white : (usable ? .primary : .secondary))
                     #endif
                 }
@@ -500,7 +519,9 @@ private struct SeatDetailPanel: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Wagon \(wagon.wagon) · miejsce \(seat.number)").font(.headline)
+                    Text("Wagon \(wagon.wagon) · miejsce \(seat.number)")
+                        .font(.headline)
+                        .lineLimit(1)
                     Text(statusText).font(.subheadline).foregroundStyle(statusColor)
                 }
                 Spacer()

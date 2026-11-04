@@ -690,26 +690,26 @@ final class TrainCoreClient: @unchecked Sendable {
             let n3 = r * 4 + 3
             let n4 = r * 4 + 4
             let xPos = 70 + r * 44
-            seatsW2.append(CoreSeat(number: n1, isFree: n1 % 3 != 0, position: .window, isSpecial: false, xy: (x: xPos, y: 24)))
-            seatsW2.append(CoreSeat(number: n2, isFree: n2 % 4 != 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 64)))
-            seatsW2.append(CoreSeat(number: n3, isFree: n3 % 2 == 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 136)))
-            seatsW2.append(CoreSeat(number: n4, isFree: n4 % 3 != 0, position: .window, isSpecial: false, xy: (x: xPos, y: 176)))
+            seatsW2.append(CoreSeat(number: n1, isFree: n1 % 3 != 0, position: .window, isSpecial: false, xy: (x: xPos, y: 14)))
+            seatsW2.append(CoreSeat(number: n2, isFree: n2 % 4 != 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 54)))
+            seatsW2.append(CoreSeat(number: n3, isFree: n3 % 2 == 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 110)))
+            seatsW2.append(CoreSeat(number: n4, isFree: n4 % 3 != 0, position: .window, isSpecial: false, xy: (x: xPos, y: 150)))
         }
 
         // Wagon 1: 1. klasa (9 przedziałów po 6 miejsc)
         var seatsW1: [CoreSeat] = []
         for r in 0..<9 {
             let comp = r + 1
-            let x1 = 80 + r * 72
-            let x2 = x1 + 36
+            let x1 = 70 + r * 76 + 4
+            let x2 = x1 + 44
             // Rząd 1 naprzeciwko
-            seatsW1.append(CoreSeat(number: comp * 10 + 1, isFree: (comp + 1) % 2 == 0, position: .window, isSpecial: false, xy: (x: x1, y: 30)))
-            seatsW1.append(CoreSeat(number: comp * 10 + 2, isFree: true, position: .unknown, isSpecial: false, xy: (x: x1, y: 70)))
-            seatsW1.append(CoreSeat(number: comp * 10 + 3, isFree: comp % 3 != 0, position: .aisle, isSpecial: false, xy: (x: x1, y: 110)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 1, isFree: (comp + 1) % 2 == 0, position: .window, isSpecial: false, xy: (x: x1, y: 14)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 2, isFree: true, position: .unknown, isSpecial: false, xy: (x: x1, y: 54)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 3, isFree: comp % 3 != 0, position: .aisle, isSpecial: false, xy: (x: x1, y: 94)))
             // Rząd 2
-            seatsW1.append(CoreSeat(number: comp * 10 + 4, isFree: true, position: .window, isSpecial: false, xy: (x: x2, y: 30)))
-            seatsW1.append(CoreSeat(number: comp * 10 + 5, isFree: (comp + 2) % 3 != 0, position: .unknown, isSpecial: false, xy: (x: x2, y: 70)))
-            seatsW1.append(CoreSeat(number: comp * 10 + 6, isFree: true, position: .aisle, isSpecial: false, xy: (x: x2, y: 110)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 4, isFree: true, position: .window, isSpecial: false, xy: (x: x2, y: 14)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 5, isFree: (comp + 2) % 3 != 0, position: .unknown, isSpecial: false, xy: (x: x2, y: 54)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 6, isFree: true, position: .aisle, isSpecial: false, xy: (x: x2, y: 94)))
         }
 
         // Wagon 3: 2. klasa z miejscami specjalnymi (OzN / rower)
@@ -721,10 +721,10 @@ final class TrainCoreClient: @unchecked Sendable {
             let n4 = r * 4 + 4
             let xPos = 80 + r * 48
             let special = r >= 10
-            seatsW3.append(CoreSeat(number: n1, isFree: true, position: .window, isSpecial: special, xy: (x: xPos, y: 24)))
-            seatsW3.append(CoreSeat(number: n2, isFree: n2 % 3 != 0, position: .aisle, isSpecial: special, xy: (x: xPos, y: 64)))
-            seatsW3.append(CoreSeat(number: n3, isFree: n3 % 2 == 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 136)))
-            seatsW3.append(CoreSeat(number: n4, isFree: true, position: .window, isSpecial: false, xy: (x: xPos, y: 176)))
+            seatsW3.append(CoreSeat(number: n1, isFree: true, position: .window, isSpecial: special, xy: (x: xPos, y: 14)))
+            seatsW3.append(CoreSeat(number: n2, isFree: n2 % 3 != 0, position: .aisle, isSpecial: special, xy: (x: xPos, y: 54)))
+            seatsW3.append(CoreSeat(number: n3, isFree: n3 % 2 == 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 110)))
+            seatsW3.append(CoreSeat(number: n4, isFree: true, position: .window, isSpecial: false, xy: (x: xPos, y: 150)))
         }
 
         let decorW2 = [
