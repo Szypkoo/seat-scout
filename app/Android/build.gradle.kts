@@ -128,6 +128,7 @@ project(":SkipUI") {
                 }
 
                 if (modified) {
+                    imageKt.setWritable(true)
                     imageKt.writeText(content)
                 }
             }

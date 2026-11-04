@@ -216,7 +216,23 @@ final class CoreRoute: @unchecked Sendable {
 final class CoreRoute: @unchecked Sendable {
     let stops: [CoreStop]
     init(stops: [CoreStop] = []) { self.stops = stops }
-    func track(nowMinutes: Int64) -> TripInfo? { nil }
+    func track(nowMinutes: Int64) -> TripInfo? {
+        guard stops.count >= 2 else { return nil }
+        var preds: [TripStopInfo] = []
+        for (i, _) in stops.enumerated() {
+            let sched = Int64(560 + i * 50)
+            preds.append(TripStopInfo(schedArr: sched, schedDep: sched + 2, arr: sched, dep: sched + 2, arrActual: i == 0, depActual: i == 0))
+        }
+        return TripInfo(
+            state: .between(0, 1),
+            isActual: true,
+            delay: 0,
+            nextStop: true,
+            minutesToNext: 18,
+            progress: 0.38,
+            stops: preds
+        )
+    }
 }
 #endif
 
@@ -233,7 +249,11 @@ func coreCompactTime(_ text: String) -> String? {
             if res.count == 12 { break }
         }
     }
-    return res.count == 12 ? res : nil
+    if res.count == 12 { return res }
+    if res.count == 4 {
+        return "20261104" + res
+    }
+    return nil
     #endif
 }
 
@@ -545,42 +565,97 @@ final class SeatPlanner: @unchecked Sendable {
     init?(arrivals: [Int32], departures: [Int32]) {}
     func setLeg(_ leg: Int, wagons: [CoreWagon]) {}
     func solve(board: Int, alight: Int, changePenaltyMinutes: Int) -> SeatPlan? {
-        SeatPlan(runs: [], seatedMinutes: 145, totalMinutes: 145, changes: 0, fullRideSeats: 1)
+        let mins = 145
+        return SeatPlan(
+            runs: [
+                PlanRunInfo(fromStop: board, toStop: alight, wagon: 2, seat: 34, seat2: nil, isWindow: true, minutes: mins)
+            ],
+            seatedMinutes: mins,
+            totalMinutes: mins,
+            changes: 0,
+            fullRideSeats: 1
+        )
     }
-    func solvePairs(board: Int, alight: Int, changePenaltyMinutes: Int) -> SeatPlan? { nil }
-    func solveMany(board: Int, alight: Int, changePenaltyMinutes: Int, people: Int) -> [SeatPlan]? { nil }
-    func solveSeparate(board: Int, alight: Int, changePenaltyMinutes: Int) -> (SeatPlan, SeatPlan)? { nil }
+    func solvePairs(board: Int, alight: Int, changePenaltyMinutes: Int) -> SeatPlan? {
+        let mins = 145
+        return SeatPlan(
+            runs: [
+                PlanRunInfo(fromStop: board, toStop: alight, wagon: 2, seat: 33, seat2: 34, isWindow: false, minutes: mins)
+            ],
+            seatedMinutes: mins,
+            totalMinutes: mins,
+            changes: 0,
+            fullRideSeats: 2
+        )
+    }
+    func solveMany(board: Int, alight: Int, changePenaltyMinutes: Int, people: Int) -> [SeatPlan]? {
+        let mins = 145
+        return (0..<people).map { i in
+            SeatPlan(
+                runs: [
+                    PlanRunInfo(fromStop: board, toStop: alight, wagon: 2, seat: 31 + i, seat2: nil, isWindow: i % 2 == 0, minutes: mins)
+                ],
+                seatedMinutes: mins,
+                totalMinutes: mins,
+                changes: 0,
+                fullRideSeats: 1
+            )
+        }
+    }
+    func solveSeparate(board: Int, alight: Int, changePenaltyMinutes: Int) -> (SeatPlan, SeatPlan)? {
+        let s = solve(board: 0, alight: 1, changePenaltyMinutes: 10)!
+        return (s, s)
+    }
 }
 
 final class StationDictionary: @unchecked Sendable {
     init?(path: String) {}
-    var count: Int { 5 }
+    var count: Int { Self.knownStations.count }
+
+    private static let knownStations: [CoreStation] = [
+        CoreStation(kod: UInt32(1), epa: UInt32(101), eva: UInt32(5100004), name: "Bielsko-Biała Główna"),
+        CoreStation(kod: UInt32(2), epa: UInt32(102), eva: UInt32(5100049), name: "Poznań Główny"),
+        CoreStation(kod: UInt32(3), epa: UInt32(103), eva: UInt32(5100065), name: "Warszawa Centralna"),
+        CoreStation(kod: UInt32(4), epa: UInt32(104), eva: UInt32(5100028), name: "Kraków Główny"),
+        CoreStation(kod: UInt32(5), epa: UInt32(105), eva: UInt32(5100014), name: "Gdańsk Główny"),
+        CoreStation(kod: UInt32(6), epa: UInt32(106), eva: UInt32(5100069), name: "Wrocław Główny"),
+        CoreStation(kod: UInt32(7), epa: UInt32(107), eva: UInt32(5100020), name: "Katowice"),
+        CoreStation(kod: UInt32(8), epa: UInt32(108), eva: UInt32(5100015), name: "Gdynia Główna"),
+        CoreStation(kod: UInt32(9), epa: UInt32(109), eva: UInt32(5100037), name: "Łódź Fabryczna"),
+        CoreStation(kod: UInt32(10), epa: UInt32(110), eva: UInt32(5100057), name: "Szczecin Główny"),
+    ]
+
     func find(_ query: String) -> CoreStation? {
-        if query.contains("Warszawa") {
-            return CoreStation(kod: UInt32(1), epa: UInt32(1), eva: UInt32(5100065), name: "Warszawa Centralna")
-        }
-        if query.contains("Kraków") {
-            return CoreStation(kod: UInt32(2), epa: UInt32(2), eva: UInt32(5100028), name: "Kraków Główny")
-        }
-        return CoreStation(kod: UInt32(100), epa: UInt32(100), eva: UInt32(5100065), name: query)
+        let q = query.lowercased()
+        if q.contains("bielsk") { return Self.knownStations[0] }
+        if q.contains("pozna") { return Self.knownStations[1] }
+        if q.contains("warszaw") { return Self.knownStations[2] }
+        if q.contains("krak") { return Self.knownStations[3] }
+        if q.contains("gda") { return Self.knownStations[4] }
+        if q.contains("wroc") || q.contains("wrocł") { return Self.knownStations[5] }
+        if q.contains("katowic") { return Self.knownStations[6] }
+        if q.contains("gdyni") { return Self.knownStations[7] }
+        if q.contains("łód") || q.contains("lod") { return Self.knownStations[8] }
+        if q.contains("szczec") { return Self.knownStations[9] }
+
+        var hash = 0
+        for ch in query.utf8 { hash = (hash * 31 + Int(ch)) & 0x7FFFFFFF }
+        let uniqueKod = UInt32((hash % 800000) + 1000)
+        let uniqueEva = UInt32(5100000 + (hash % 90000))
+        return CoreStation(kod: uniqueKod, epa: uniqueKod, eva: uniqueEva, name: query)
     }
+
     func station(eva: UInt32) -> CoreStation? {
-        if eva == UInt32(5100065) {
-            return CoreStation(kod: UInt32(1), epa: UInt32(1), eva: UInt32(5100065), name: "Warszawa Centralna")
+        if let found = Self.knownStations.first(where: { $0.eva == eva }) {
+            return found
         }
-        if eva == UInt32(5100028) {
-            return CoreStation(kod: UInt32(2), epa: UInt32(2), eva: UInt32(5100028), name: "Kraków Główny")
-        }
-        return CoreStation(kod: UInt32(100), epa: UInt32(100), eva: eva, name: "Stacja \(eva)")
+        return CoreStation(kod: eva, epa: eva, eva: eva, name: "Stacja \(eva)")
     }
+
     func suggest(_ query: String, limit: Int = 8) -> [CoreStation] {
-        [
-            CoreStation(kod: UInt32(1), epa: UInt32(1), eva: UInt32(5100065), name: "Warszawa Centralna"),
-            CoreStation(kod: UInt32(2), epa: UInt32(2), eva: UInt32(5100028), name: "Kraków Główny"),
-            CoreStation(kod: UInt32(3), epa: UInt32(3), eva: UInt32(5100014), name: "Gdańsk Główny"),
-            CoreStation(kod: UInt32(4), epa: UInt32(4), eva: UInt32(5100069), name: "Wrocław Główny"),
-            CoreStation(kod: UInt32(5), epa: UInt32(5), eva: UInt32(5100049), name: "Poznań Główny"),
-        ]
+        let q = query.lowercased()
+        let filtered = Self.knownStations.filter { $0.name.lowercased().contains(q) }
+        return filtered.isEmpty ? Array(Self.knownStations.prefix(limit)) : Array(filtered.prefix(limit))
     }
 }
 
@@ -588,49 +663,129 @@ final class TrainCoreClient: @unchecked Sendable {
     init(transport: any HTTPTransport) {}
     static var version: String { "0.1.0-android" }
     func downloadStations(to path: String) throws {}
+
     func searchConnections(date: String, from: CoreStation, to: CoreStation) throws -> [CoreTrain] {
         [
-            CoreTrain(connectionId: 101, number: 13100, category: "EIP", name: "Górnik",
-                      departure: "\(date) 08:20", arrival: "\(date) 10:45",
+            CoreTrain(connectionId: 101, number: 45000, category: "EIC", name: "Beskidy",
+                      departure: "\(date) 06:15:00", arrival: "\(date) 11:32:00",
                       fromKod: from.kod, toKod: to.kod),
-            CoreTrain(connectionId: 102, number: 5310, category: "IC", name: "Warmia",
-                      departure: "\(date) 11:15", arrival: "\(date) 14:00",
+            CoreTrain(connectionId: 102, number: 41100, category: "IC", name: "Korfanty",
+                      departure: "\(date) 09:20:00", arrival: "\(date) 14:45:00",
                       fromKod: from.kod, toKod: to.kod),
-            CoreTrain(connectionId: 103, number: 3514, category: "TLK", name: "Karpaty",
-                      departure: "\(date) 14:30", arrival: "\(date) 17:10",
+            CoreTrain(connectionId: 103, number: 38102, category: "TLK", name: "Szyndzielnia",
+                      departure: "\(date) 13:40:00", arrival: "\(date) 19:15:00",
+                      fromKod: from.kod, toKod: to.kod),
+            CoreTrain(connectionId: 104, number: 45102, category: "IC", name: "Hutnik",
+                      departure: "\(date) 17:05:00", arrival: "\(date) 22:30:00",
                       fromKod: from.kod, toKod: to.kod),
         ]
     }
+
     func seats(train: CoreTrain, from: CoreStation, to: CoreStation, travelClass: Int = 2, excludeSpecial: Bool = true) throws -> [CoreWagon] {
-        var seatsW1: [CoreSeat] = []
-        for i in 1...60 {
-            seatsW1.append(CoreSeat(number: i, isFree: i % 3 != 0, position: i % 2 == 0 ? .window : .aisle, isSpecial: i > 55, xy: (x: (i % 15) * 40 + 20, y: (i / 15) * 40 + 20)))
-        }
+        // Wagon 2: 2. klasa bezprzedziałowa (15 rzędów po 4 fotele, szer: 760, wys: 200)
         var seatsW2: [CoreSeat] = []
-        for i in 1...60 {
-            seatsW2.append(CoreSeat(number: i, isFree: i % 2 == 0, position: i % 2 == 0 ? .window : .aisle, isSpecial: false, xy: (x: (i % 15) * 40 + 20, y: (i / 15) * 40 + 20)))
+        for r in 0..<15 {
+            let n1 = r * 4 + 1
+            let n2 = r * 4 + 2
+            let n3 = r * 4 + 3
+            let n4 = r * 4 + 4
+            let xPos = 70 + r * 44
+            seatsW2.append(CoreSeat(number: n1, isFree: n1 % 3 != 0, position: .window, isSpecial: false, xy: (x: xPos, y: 24)))
+            seatsW2.append(CoreSeat(number: n2, isFree: n2 % 4 != 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 64)))
+            seatsW2.append(CoreSeat(number: n3, isFree: n3 % 2 == 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 136)))
+            seatsW2.append(CoreSeat(number: n4, isFree: n4 % 3 != 0, position: .window, isSpecial: false, xy: (x: xPos, y: 176)))
         }
+
+        // Wagon 1: 1. klasa (9 przedziałów po 6 miejsc)
+        var seatsW1: [CoreSeat] = []
+        for r in 0..<9 {
+            let xPos = 80 + r * 72
+            for c in 1...6 {
+                let n = r * 6 + c
+                let isWindow = (c == 1 || c == 2)
+                let isAisle = (c == 5 || c == 6)
+                let yPos = 30 + (c - 1) * 26
+                seatsW1.append(CoreSeat(number: n, isFree: n % 2 == 0, position: isWindow ? .window : (isAisle ? .aisle : .unknown), isSpecial: false, xy: (x: xPos, y: yPos)))
+            }
+        }
+
+        // Wagon 3: 2. klasa z miejscami specjalnymi (OzN / rower)
+        var seatsW3: [CoreSeat] = []
+        for r in 0..<12 {
+            let n1 = r * 4 + 1
+            let n2 = r * 4 + 2
+            let n3 = r * 4 + 3
+            let n4 = r * 4 + 4
+            let xPos = 80 + r * 48
+            let special = r >= 10
+            seatsW3.append(CoreSeat(number: n1, isFree: true, position: .window, isSpecial: special, xy: (x: xPos, y: 24)))
+            seatsW3.append(CoreSeat(number: n2, isFree: n2 % 3 != 0, position: .aisle, isSpecial: special, xy: (x: xPos, y: 64)))
+            seatsW3.append(CoreSeat(number: n3, isFree: n3 % 2 == 0, position: .aisle, isSpecial: false, xy: (x: xPos, y: 136)))
+            seatsW3.append(CoreSeat(number: n4, isFree: true, position: .window, isSpecial: false, xy: (x: xPos, y: 176)))
+        }
+
+        let decorW2 = [
+            CoreDecor(x: 18, y: 18, w: 42, h: 42, isSign: true, code: "401", title: "Toaleta"),
+            CoreDecor(x: 720, y: 140, w: 35, h: 35, isSign: true, code: "402", title: "Bagaż"),
+        ]
+
+        let decorW1 = [
+            CoreDecor(x: 18, y: 18, w: 42, h: 42, isSign: true, code: "401", title: "Toaleta"),
+            CoreDecor(x: 720, y: 130, w: 35, h: 35, isSign: true, code: "405", title: "Bufet WARS"),
+        ]
+
+        let decorW3 = [
+            CoreDecor(x: 18, y: 140, w: 42, h: 42, isSign: true, code: "403", title: "Miejsce na rowery"),
+            CoreDecor(x: 18, y: 18, w: 42, h: 42, isSign: true, code: "401", title: "Toaleta z przewijakiem"),
+        ]
+
         return [
-            CoreWagon(wagon: 1, travelClass: 1, freeCount: 40, occupiedCount: 20, seats: seatsW1, width: 800, height: 200, decor: [], direction: 1, compartments: 6),
-            CoreWagon(wagon: 2, travelClass: 2, freeCount: 30, occupiedCount: 30, seats: seatsW2, width: 800, height: 200, decor: [], direction: 1, compartments: 8)
+            CoreWagon(wagon: 1, travelClass: 1, freeCount: 27, occupiedCount: 27, seats: seatsW1, width: 760, height: 200, decor: decorW1, direction: 1, compartments: 9),
+            CoreWagon(wagon: 2, travelClass: 2, freeCount: 38, occupiedCount: 22, seats: seatsW2, width: 760, height: 200, decor: decorW2, direction: 1, compartments: -1),
+            CoreWagon(wagon: 3, travelClass: 2, freeCount: 32, occupiedCount: 16, seats: seatsW3, width: 760, height: 200, decor: decorW3, direction: 1, compartments: -1),
         ]
     }
+
     func seats(train: CoreTrain, from: CoreStation, to: CoreStation, departure: String, arrival: String, travelClass: Int = 2, excludeSpecial: Bool = true) throws -> [CoreWagon] {
         try seats(train: train, from: from, to: to, travelClass: travelClass, excludeSpecial: excludeSpecial)
     }
+
     func route(train: CoreTrain, from: CoreStation, to: CoreStation) throws -> [CoreStop] {
-        [
-            CoreStop(name: from.name, eva: from.eva, arrival: "08:20", departure: "08:20", canBoard: true, canAlight: false, platform: "1", track: "2", arrivalActual: "", departureActual: "", messages: ""),
-            CoreStop(name: "Opoczno Południe", eva: UInt32(5100045), arrival: "09:10", departure: "09:12", canBoard: true, canAlight: true, platform: "2", track: "1", arrivalActual: "", departureActual: "", messages: ""),
-            CoreStop(name: to.name, eva: to.eva, arrival: "10:45", departure: "10:45", canBoard: false, canAlight: true, platform: "3", track: "1", arrivalActual: "", departureActual: "", messages: ""),
+        let day = String(train.departure.prefix(10))
+        return [
+            CoreStop(name: from.name, eva: from.eva,
+                     arrival: "\(day) 09:20:00", departure: "\(day) 09:20:00",
+                     canBoard: true, canAlight: false, platform: "1", track: "2",
+                     arrivalActual: "\(day) 09:20:00", departureActual: "\(day) 09:21:00", messages: ""),
+            CoreStop(name: "Katowice", eva: UInt32(5100020),
+                     arrival: "\(day) 10:15:00", departure: "\(day) 10:20:00",
+                     canBoard: true, canAlight: true, platform: "3", track: "1",
+                     arrivalActual: "\(day) 10:14:00", departureActual: "\(day) 10:20:00", messages: ""),
+            CoreStop(name: "Wrocław Główny", eva: UInt32(5100069),
+                     arrival: "\(day) 12:30:00", departure: "\(day) 12:35:00",
+                     canBoard: true, canAlight: true, platform: "2", track: "4",
+                     arrivalActual: "", departureActual: "", messages: ""),
+            CoreStop(name: to.name, eva: to.eva,
+                     arrival: "\(day) 14:45:00", departure: "\(day) 14:45:00",
+                     canBoard: false, canAlight: true, platform: "4", track: "2",
+                     arrivalActual: "", departureActual: "", messages: ""),
         ]
     }
+
     func routeHandle(train: CoreTrain, from: CoreStation, to: CoreStation) throws -> CoreRoute {
         let stops = try route(train: train, from: from, to: to)
         return CoreRoute(stops: stops)
     }
+
     func price(train: CoreTrain, travelClass: Int = 2, discountCode: Int32) throws -> Double {
-        travelClass == 1 ? 169.00 : 79.00
+        let base = (train.category == "EIC" || train.category == "EIP") ? 149.00 : 78.00
+        let classMultiplier = travelClass == 1 ? 1.4 : 1.0
+        let fullPrice = base * classMultiplier
+        switch discountCode {
+        case 1710: return (fullPrice * 0.63).rounded()
+        case 1990: return (fullPrice * 0.49).rounded()
+        default: return fullPrice
+        }
     }
 }
 #endif
