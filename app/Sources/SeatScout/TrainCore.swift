@@ -661,7 +661,7 @@ final class StationDictionary: @unchecked Sendable {
 
 final class TrainCoreClient: @unchecked Sendable {
     init(transport: any HTTPTransport) {}
-    static var version: String { "0.1.0-android" }
+    static var version: String { "0.1.0" }
     func downloadStations(to path: String) throws {}
 
     func searchConnections(date: String, from: CoreStation, to: CoreStation) throws -> [CoreTrain] {
@@ -699,14 +699,17 @@ final class TrainCoreClient: @unchecked Sendable {
         // Wagon 1: 1. klasa (9 przedziałów po 6 miejsc)
         var seatsW1: [CoreSeat] = []
         for r in 0..<9 {
-            let xPos = 80 + r * 72
-            for c in 1...6 {
-                let n = r * 6 + c
-                let isWindow = (c == 1 || c == 2)
-                let isAisle = (c == 5 || c == 6)
-                let yPos = 30 + (c - 1) * 26
-                seatsW1.append(CoreSeat(number: n, isFree: n % 2 == 0, position: isWindow ? .window : (isAisle ? .aisle : .unknown), isSpecial: false, xy: (x: xPos, y: yPos)))
-            }
+            let comp = r + 1
+            let x1 = 80 + r * 72
+            let x2 = x1 + 36
+            // Rząd 1 naprzeciwko
+            seatsW1.append(CoreSeat(number: comp * 10 + 1, isFree: (comp + 1) % 2 == 0, position: .window, isSpecial: false, xy: (x: x1, y: 30)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 2, isFree: true, position: .unknown, isSpecial: false, xy: (x: x1, y: 70)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 3, isFree: comp % 3 != 0, position: .aisle, isSpecial: false, xy: (x: x1, y: 110)))
+            // Rząd 2
+            seatsW1.append(CoreSeat(number: comp * 10 + 4, isFree: true, position: .window, isSpecial: false, xy: (x: x2, y: 30)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 5, isFree: (comp + 2) % 3 != 0, position: .unknown, isSpecial: false, xy: (x: x2, y: 70)))
+            seatsW1.append(CoreSeat(number: comp * 10 + 6, isFree: true, position: .aisle, isSpecial: false, xy: (x: x2, y: 110)))
         }
 
         // Wagon 3: 2. klasa z miejscami specjalnymi (OzN / rower)
@@ -740,9 +743,9 @@ final class TrainCoreClient: @unchecked Sendable {
         ]
 
         return [
-            CoreWagon(wagon: 1, travelClass: 1, freeCount: 27, occupiedCount: 27, seats: seatsW1, width: 760, height: 200, decor: decorW1, direction: 1, compartments: 9),
-            CoreWagon(wagon: 2, travelClass: 2, freeCount: 38, occupiedCount: 22, seats: seatsW2, width: 760, height: 200, decor: decorW2, direction: 1, compartments: -1),
-            CoreWagon(wagon: 3, travelClass: 2, freeCount: 32, occupiedCount: 16, seats: seatsW3, width: 760, height: 200, decor: decorW3, direction: 1, compartments: -1),
+            CoreWagon(wagon: 1, travelClass: 1, freeCount: 27, occupiedCount: 27, seats: seatsW1, width: 760, height: 200, decor: decorW1, direction: 1, compartments: 1),
+            CoreWagon(wagon: 2, travelClass: 2, freeCount: 38, occupiedCount: 22, seats: seatsW2, width: 760, height: 200, decor: decorW2, direction: 1, compartments: 0),
+            CoreWagon(wagon: 3, travelClass: 2, freeCount: 32, occupiedCount: 16, seats: seatsW3, width: 760, height: 200, decor: decorW3, direction: 1, compartments: 0),
         ]
     }
 

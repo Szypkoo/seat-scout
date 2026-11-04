@@ -482,17 +482,32 @@ final class AppModel: ObservableObject {
     }
 
     nonisolated private static func epochMinutes(_ compact: String?) -> Int32? {
-        guard let c = compact, c.count == 12, let n = Int(c) else { return nil }
+        guard let c = compact, c.count == 12 else { return nil }
+        #if !SKIP
+        guard let n = Int(c) else { return nil }
         var comps = DateComponents()
         comps.year = n / 100_000_000
         comps.month = n / 1_000_000 % 100
         comps.day = n / 10_000 % 100
         comps.hour = n / 100 % 100
         comps.minute = n % 100
+        #else
+        guard let y = Int(c.prefix(4).description),
+              let mo = Int(c.dropFirst(4).prefix(2).description),
+              let d = Int(c.dropFirst(6).prefix(2).description),
+              let h = Int(c.dropFirst(8).prefix(2).description),
+              let mi = Int(c.dropFirst(10).prefix(2).description) else { return nil }
+        var comps = DateComponents()
+        comps.year = y
+        comps.month = mo
+        comps.day = d
+        comps.hour = h
+        comps.minute = mi
+        #endif
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
-        guard let d = cal.date(from: comps) else { return nil }
-        return Int32(d.timeIntervalSince1970 / 60)
+        guard let dt = cal.date(from: comps) else { return nil }
+        return Int32(dt.timeIntervalSince1970 / 60)
     }
 
     private func applyDetails(core: CoreTrain, from: CoreStation, to: CoreStation, wagons: [CoreWagon],

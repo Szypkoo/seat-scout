@@ -47,11 +47,12 @@ project(":SkipUI") {
                     modified = true
                 }
 
-                val symbolTarget = "\"exclamationmark.triangle.fill\" -> return \"Icons.Filled.Warning\""
+                val elseTarget = "else -> return null\n            }\n        }\n\n        /// Returns"
                 val extraSymbols = """
                 "bolt.fill", "bolt" -> return "Icons.Filled.Bolt"
                 "point.topleft.down.to.point.bottomright.curvepath" -> return "Icons.Filled.AltRoute"
                 "chair.lounge.fill", "chair.lounge", "chair" -> return "Icons.Filled.EventSeat"
+                "bell.fill", "bell" -> return "Icons.Filled.Notifications"
                 "terminal.fill", "terminal" -> return "Icons.Filled.Terminal"
                 "circle.fill" -> return "Icons.Filled.Circle"
                 "circle" -> return "Icons.Outlined.Circle"
@@ -65,7 +66,8 @@ project(":SkipUI") {
                 "rectangle.portrait.lefthalf.filled" -> return "Icons.Outlined.CropPortrait"
                 "figure.roll" -> return "Icons.Filled.Accessible"
                 "figure.stand" -> return "Icons.Filled.Accessibility"
-                "xmark.circle.fill" -> return "Icons.Filled.Cancel"
+                "xmark.circle.fill", "xmark.circle" -> return "Icons.Filled.Cancel"
+                "checkmark.circle.fill", "checkmark.circle" -> return "Icons.Filled.CheckCircle"
                 "arrow.right.circle.fill" -> return "Icons.Filled.ArrowCircleRight"
                 "clock.arrow.circlepath" -> return "Icons.Outlined.History"
                 "arrow.right" -> return "Icons.Outlined.ArrowForward"
@@ -77,10 +79,11 @@ project(":SkipUI") {
                 "fork.knife" -> return "Icons.Filled.Restaurant"
                 "exclamationmark.bubble.fill" -> return "Icons.Filled.Feedback"
                 "star" -> return "Icons.Outlined.Star"
+                "info.circle.fill", "info.circle" -> return "Icons.Filled.Info"
                 """.trimIndent()
 
-                if (!content.contains("\"bolt.fill\"") && content.contains(symbolTarget)) {
-                    content = content.replace(symbolTarget, "$symbolTarget\n                $extraSymbols")
+                if (!content.contains("\"bolt.fill\"") && content.contains(elseTarget)) {
+                    content = content.replace(elseTarget, "$extraSymbols\n                $elseTarget")
                     modified = true
                 }
 
@@ -107,6 +110,7 @@ project(":SkipUI") {
                 "Icons.Filled.Bolt" -> return Icons.Filled.Bolt.sref()
                 "Icons.Filled.AltRoute" -> return Icons.Filled.AltRoute.sref()
                 "Icons.Filled.EventSeat" -> return Icons.Filled.EventSeat.sref()
+                "Icons.Filled.Notifications" -> return Icons.Filled.Notifications.sref()
                 "Icons.Filled.Terminal" -> return Icons.Filled.Terminal.sref()
                 "Icons.Filled.Circle" -> return Icons.Filled.Circle.sref()
                 "Icons.Filled.Flag" -> return Icons.Filled.Flag.sref()
@@ -114,12 +118,14 @@ project(":SkipUI") {
                 "Icons.Filled.Accessible" -> return Icons.Filled.Accessible.sref()
                 "Icons.Filled.Accessibility" -> return Icons.Filled.Accessibility.sref()
                 "Icons.Filled.Cancel" -> return Icons.Filled.Cancel.sref()
+                "Icons.Filled.CheckCircle" -> return Icons.Filled.CheckCircle.sref()
                 "Icons.Filled.ArrowCircleRight" -> return Icons.Filled.ArrowCircleRight.sref()
                 "Icons.Filled.Wc" -> return Icons.Filled.Wc.sref()
                 "Icons.Filled.Luggage" -> return Icons.Filled.Luggage.sref()
                 "Icons.Filled.DirectionsBike" -> return Icons.Filled.DirectionsBike.sref()
                 "Icons.Filled.Restaurant" -> return Icons.Filled.Restaurant.sref()
                 "Icons.Filled.Feedback" -> return Icons.Filled.Feedback.sref()
+                "Icons.Filled.Info" -> return Icons.Filled.Info.sref()
                 """.trimIndent()
 
                 if (!content.contains("\"Icons.Filled.Bolt\"") && content.contains(vectorFilledTarget)) {

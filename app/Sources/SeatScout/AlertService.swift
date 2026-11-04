@@ -332,7 +332,7 @@ final class AlertService: ObservableObject {
         @unknown default: status = "?"
         }
         #else
-        status = "dostępne (Android)"
+        status = "włączone"
         #endif
         #if !SKIP && canImport(BackgroundTasks)
         let pending = await BGTaskScheduler.shared.pendingTaskRequests().map { "\($0.identifier) od \($0.earliestBeginDate?.formatted(date: .omitted, time: .shortened) ?? "?")" }
