@@ -153,7 +153,7 @@ struct LiveView: View {
         #if !SKIP
         .listStyle(.insetGrouped)
         #else
-        .listStyle(.plain)
+        .listStyle(.automatic)
         #endif
     }
     @ViewBuilder

@@ -26,7 +26,7 @@ struct SavedView: View {
         #if !SKIP
         .listStyle(.insetGrouped)
         #else
-        .listStyle(.plain)
+        .listStyle(.automatic)
         #endif
         .task { await alerts.refreshPermission() }
     }

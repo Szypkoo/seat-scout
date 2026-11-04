@@ -118,7 +118,7 @@ struct DeveloperView: View {
         #if !SKIP
         .listStyle(.insetGrouped)
         #else
-        .listStyle(.plain)
+        .listStyle(.automatic)
         #endif
 
     }

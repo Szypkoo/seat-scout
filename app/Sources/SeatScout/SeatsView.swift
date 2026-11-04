@@ -126,7 +126,7 @@ struct SeatsView: View {
         #if !SKIP
         .listStyle(.insetGrouped)
         #else
-        .listStyle(.plain)
+        .listStyle(.automatic)
         #endif
         #if !SKIP
         .safeAreaInset(edge: .bottom) {

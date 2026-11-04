@@ -110,7 +110,7 @@ struct SegmentsView: View {
         #if !SKIP
         .listStyle(.insetGrouped)
         #else
-        .listStyle(.plain)
+        .listStyle(.automatic)
         #endif
         .task(id: model.currentTrain.id) { await model.loadSegments() }
     }
