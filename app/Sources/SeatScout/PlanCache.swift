@@ -90,12 +90,20 @@ struct DetailsSnapshot: Codable {
 
 enum DiskCache {
     private static var dir: URL? {
+        #if !SKIP
         try? FileManager.default.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        #else
+        return nil
+        #endif
     }
 
     private static func file(_ prefix: String, _ key: String) -> URL? {
+        #if !SKIP
         let safe = String(key.map { ($0 >= "a" && $0 <= "z") || ($0 >= "A" && $0 <= "Z") || ($0 >= "0" && $0 <= "9") || $0 == "-" ? $0 : "_" })
         return dir?.appendingPathComponent("\(prefix)-\(safe).json")
+        #else
+        return nil
+        #endif
     }
 
     #if !SKIP

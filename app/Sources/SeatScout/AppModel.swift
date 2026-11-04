@@ -396,6 +396,7 @@ final class AppModel: ObservableObject {
         log(.info, "app", "szczegóły: \(core.category) \(core.number) \(core.name)")
 
         let detailsKey = Self.cacheKey(core, from, to)
+        #if !SKIP
         let cachedDetails = await Task.detached { DiskCache.load(DetailsSnapshot.self, prefix: "details", key: detailsKey) }.value
         guard token == detailsToken else { return }
         if let c = cachedDetails, !c.wagons.isEmpty {
@@ -411,6 +412,10 @@ final class AppModel: ObservableObject {
             ticketPrices = [:]
             priceNote = nil
         }
+        #else
+        ticketPrices = [:]
+        priceNote = nil
+        #endif
 
         let codes: [(Int, Int32)] = [(0, 1010), (37, 1710), (51, 1990)]
         let pricePair = await Task.detached {
@@ -467,6 +472,7 @@ final class AppModel: ObservableObject {
             } else {
                 log(.warn, "app", "brak wagonów z miejscami w odpowiedzi")
             }
+            #if !SKIP
             if !wagons.isEmpty {
                 var strPrices: [String: Double] = [:]
                 for (k, v) in prices { strPrices[String(k)] = v }
@@ -475,6 +481,7 @@ final class AppModel: ObservableObject {
                                                priceNote: prices.isEmpty ? note : nil)
                 await Task.detached { DiskCache.save(snapshot, prefix: "details", key: detailsKey) }.value
             }
+            #endif
         } catch {
             log(.error, "app", "miejsca: \(Self.describe(error))")
             showToast(Self.describe(error))
@@ -595,6 +602,7 @@ final class AppModel: ObservableObject {
         isLoadingSegments = true
         segmentsProgress = "Wczytuję zapisane dane…"
 
+        #if !SKIP
         if !force, legsData.isEmpty,
            let snap = await Task.detached(operation: { DiskCache.load(PlanSnapshot.self, prefix: "plan", key: key) }).value,
            snap.stops.count >= 2 {
@@ -613,6 +621,7 @@ final class AppModel: ObservableObject {
                 return
             }
         }
+        #endif
 
         segmentsProgress = legsData.isEmpty ? "Pobieram trasę…" : "Odświeżam dane…"
         let knownStops = planStops
@@ -713,6 +722,7 @@ final class AppModel: ObservableObject {
                         return res
                     }
                     #endif
+                    #if !SKIP
                     var cachedLegs: [String: [CachedWagon]] = [:]
                     for (k, v) in merged {
                         cachedLegs[String(k)] = v.map { CachedWagon($0) }
@@ -721,10 +731,15 @@ final class AppModel: ObservableObject {
                         key: key, savedAt: Date(), stops: stops.map { CachedStop($0) },
                         legs: cachedLegs)
                     await Task.detached { DiskCache.save(snapshot, prefix: "plan", key: key) }.value
+                    #endif
                     await MainActor.run {
                         guard let self, self.segmentsFor == trainId else { return }
                         self.failedLegs = failedCount
+                        #if !SKIP
                         self.planDataAge = snapshot.savedAt
+                        #else
+                        self.planDataAge = Date()
+                        #endif
                         self.applyPlanData(stops: stops, legs: merged, from: from, to: to, resetRange: false)
                         log(.info, "plan", "odświeżono \(fresh.count) z \(total) odcinków (błędy: \(failedCount)), zapisano na dysku")
                     }
