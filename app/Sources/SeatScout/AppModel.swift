@@ -638,6 +638,7 @@ final class AppModel: ObservableObject {
                 var failed = 0, done = 0, nextLeg = 0
                 var fresh: [Int: [CoreWagon]] = [:]
                 let total = stops.count - 1
+                #if !SKIP
                 await withTaskGroup(of: LegLoadResult.self) { group in
                     while nextLeg < min(2, total) {
                         let n = nextLeg
@@ -673,6 +674,31 @@ final class AppModel: ObservableObject {
                         }
                     }
                 }
+                #else
+                for n in 0..<total {
+                    guard !Task.isCancelled else { break }
+                    let wagons = Self.loadLeg(n, stops: stops, client: client, dict: dict, core: core)
+                    done += 1
+                    if let wagons {
+                        fresh[n] = wagons
+                        let item = Self.segmentItem(n, stops: stops, wagons: wagons)
+                        await MainActor.run {
+                            guard let self, self.segmentsFor == trainId else { return }
+                            self.segmentsProgress = "Odcinki \(done) z \(total)"
+                            self.legsData[n] = wagons
+                            if let i = self.segmentsData.firstIndex(where: { $0.legIndex == n }) {
+                                self.segmentsData[i] = item
+                            } else {
+                                self.segmentsData.append(item)
+                                self.segmentsData.sort { $0.legIndex < $1.legIndex }
+                            }
+                        }
+                    } else {
+                        failed += 1
+                        log(.error, "plan", "odcinek \(n + 1) nie pobrany: \(stops[n].name) → \(stops[n + 1].name)")
+                    }
+                }
+                #endif
 
                 if !fresh.isEmpty {
                     let failedCount = failed

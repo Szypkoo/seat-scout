@@ -100,7 +100,7 @@ project(":SkipUI") {
                 "Icons.Outlined.ArrowDownward" -> return Icons.Outlined.ArrowDownward.sref()
                 """.trimIndent()
 
-                if (!content.contains("\"Icons.Outlined.Circle\"") && content.contains(vectorOutlinedTarget)) {
+                if (!content.contains("Icons.Outlined.Circle.sref()") && content.contains(vectorOutlinedTarget)) {
                     content = content.replace(vectorOutlinedTarget, "$vectorOutlinedTarget\n                $extraOutlined")
                     modified = true
                 }
@@ -128,7 +128,7 @@ project(":SkipUI") {
                 "Icons.Filled.Info" -> return Icons.Filled.Info.sref()
                 """.trimIndent()
 
-                if (!content.contains("\"Icons.Filled.Bolt\"") && content.contains(vectorFilledTarget)) {
+                if (!content.contains("Icons.Filled.Bolt.sref()") && content.contains(vectorFilledTarget)) {
                     content = content.replace(vectorFilledTarget, "$vectorFilledTarget\n                $extraFilled")
                     modified = true
                 }
@@ -136,6 +136,18 @@ project(":SkipUI") {
                 if (modified) {
                     imageKt.setWritable(true)
                     imageKt.writeText(content)
+                }
+            }
+
+            val layoutsKt = file("${projectDir}/src/main/kotlin/skip/ui/ComposeLayouts.kt")
+            if (layoutsKt.exists()) {
+                var lContent = layoutsKt.readText()
+                val posTarget = "Layout(content = { -> target(context.content()) }) l@{ measurables, constraints ->\n            if (measurables.isEmpty()) {\n                return@l layout(width = 0, height = 0) { ->  }\n            }\n            val targetPlaceables = measurables.map { it -> it.measure(constraints) }\n            layout(width = targetPlaceables[0].width, height = targetPlaceables[0].height)"
+                val posReplacement = "Layout(content = { -> target(context.content()) }) l@{ measurables, constraints ->\n            if (measurables.isEmpty()) {\n                return@l layout(width = 0, height = 0) { ->  }\n            }\n            val targetPlaceables = measurables.map { it -> it.measure(constraints) }\n            val layoutW = if (constraints.hasBoundedWidth) constraints.maxWidth else maxOf(xPx + targetPlaceables[0].width / 2, targetPlaceables[0].width)\n            val layoutH = if (constraints.hasBoundedHeight) constraints.maxHeight else maxOf(yPx + targetPlaceables[0].height / 2, targetPlaceables[0].height)\n            layout(width = layoutW, height = layoutH)"
+                if (lContent.contains(posTarget)) {
+                    lContent = lContent.replace(posTarget, posReplacement)
+                    layoutsKt.setWritable(true)
+                    layoutsKt.writeText(lContent)
                 }
             }
         }
