@@ -700,8 +700,8 @@ final class TrainCoreClient: @unchecked Sendable {
         var seatsW1: [CoreSeat] = []
         for r in 0..<9 {
             let comp = r + 1
-            let x1 = 70 + r * 76 + 4
-            let x2 = x1 + 44
+            let x1 = 60 + r * 120
+            let x2 = x1 + 58
             // Rząd 1 naprzeciwko
             seatsW1.append(CoreSeat(number: comp * 10 + 1, isFree: (comp + 1) % 2 == 0, position: .window, isSpecial: false, xy: (x: x1, y: 14)))
             seatsW1.append(CoreSeat(number: comp * 10 + 2, isFree: true, position: .unknown, isSpecial: false, xy: (x: x1, y: 54)))

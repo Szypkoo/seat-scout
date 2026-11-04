@@ -140,16 +140,23 @@ struct SeatsView: View {
         #else
         .overlay(alignment: .bottom) {
             if let w = currentWagon, let n = selected, let seat = w.seats.first(where: { $0.number == n }) {
-                SeatDetailPanel(wagon: w, seat: seat, onClose: { selected = nil })
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                SeatDetailPanel(wagon: w, seat: seat, onClose: {
+                    withAnimation(.snappy) { selected = nil }
+                })
+                .id("seat-detail-\(n)")
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         #endif
+        .animation(.snappy, value: wagonChoice)
         .animation(.snappy, value: selected)
         .task { await model.loadSegments() }
         .onChange(of: model.currentTrain.id) { _, _ in
-            legChoice = -1; wagonChoice = nil; selected = nil
+            withAnimation(.snappy) {
+                legChoice = -1; wagonChoice = nil; selected = nil
+            }
         }
     }
 
@@ -166,7 +173,9 @@ struct SeatsView: View {
             } label: {
                 Label("Odcinek", systemImage: "arrow.left.and.right")
             }
-            .onChange(of: legChoice) { _, _ in selected = nil }
+            .onChange(of: legChoice) { _, _ in
+                withAnimation(.snappy) { selected = nil }
+            }
         } footer: {
             Text(legChoice < 0
                  ? "Miejsca wolne na całej trasie Twojego przejazdu – takie jak widzi oficjalna aplikacja."
@@ -196,8 +205,10 @@ struct SeatsView: View {
         let background: Color = isCurrent ? Color.accentColor : Color.secondary.opacity(0.2)
         let textColor: Color = isCurrent ? Color.white : Color.primary
         return Button {
-            wagonChoice = w.wagon
-            selected = nil
+            withAnimation(.snappy) {
+                wagonChoice = w.wagon
+                selected = nil
+            }
         } label: {
             VStack(spacing: 2) {
                 Text("W\(w.wagon)").font(.subheadline.weight(.bold)).lineLimit(1)
@@ -260,7 +271,11 @@ struct SeatsView: View {
                         wagon: wagon, width: wagonLayout.width, height: wagonLayout.height,
                         decor: wagonLayout.decor, compartments: compartments,
                         selected: selected, planned: model.plannedSeats, mine: model.mySeat,
-                        onSelect: { selected = $0 == selected ? nil : $0 })
+                        onSelect: { seatNumber in
+                            withAnimation(.snappy) {
+                                selected = seatNumber == selected ? nil : seatNumber
+                            }
+                        })
                     directionArrow(wagon)
                 }
                 Text("początek wagonu").font(.caption2).foregroundStyle(.secondary)
@@ -309,18 +324,51 @@ struct SeatsView: View {
 
     private var legendSection: some View {
         Section("Legenda") {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), alignment: .leading)], alignment: .leading, spacing: 8) {
-                ForEach(legendItems) { item in
-                    HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(item.fill)
-                            .frame(width: 16, height: 16)
-                            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(item.stroke, lineWidth: 2))
-                        Text(item.label).font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        legendItemRow(legendItems[0])
+                        legendItemRow(legendItems[2])
+                        legendItemRow(legendItems[4])
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        legendItemRow(legendItems[1])
+                        legendItemRow(legendItems[3])
+                        legendItemRow(legendItems[5])
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Divider()
+
+                HStack(spacing: 8) {
+                    #if !SKIP
+                    Image(systemName: "rectangle.portrait.lefthalf.filled")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    #else
+                    Capsule()
+                        .fill(Color.cyan)
+                        .frame(width: 3, height: 14)
+                    #endif
+                    Text("Niebieski pasek przy fotelu = przy oknie")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            Label("Niebieski pasek przy fotelu = przy oknie", systemImage: "rectangle.portrait.lefthalf.filled")
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func legendItemRow(_ item: LegendItem) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(item.fill)
+                .frame(width: 16, height: 16)
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(item.stroke, lineWidth: 2))
+            Text(item.label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -352,7 +400,7 @@ private struct WagonMapView: View {
             ForEach(compartments?.groups ?? []) { group in
                 let bounds = compartmentBounds(group)
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.secondary.opacity(0.7), lineWidth: 1)
+                    .strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1)
                     .frame(width: bounds.width - 2, height: bounds.height - 2)
                     .position(x: bounds.midX, y: bounds.midY)
                     .allowsHitTesting(false)
@@ -376,12 +424,9 @@ private struct WagonMapView: View {
             ForEach(compartments?.groups ?? []) { group in
                 let bounds = compartmentBounds(group)
                 Text("Przedział \(group.id)")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.secondary.opacity(0.15), in: Capsule())
+                    .foregroundStyle(.secondary)
                     .position(x: bounds.midX, y: bounds.midY)
                     .allowsHitTesting(false)
             }
