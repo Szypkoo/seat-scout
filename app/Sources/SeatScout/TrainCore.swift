@@ -625,7 +625,10 @@ final class TrainCoreClient: @unchecked Sendable {
             CoreStop(name: to.name, eva: to.eva, arrival: "10:45", departure: "10:45", canBoard: false, canAlight: true, platform: "3", track: "1", arrivalActual: "", departureActual: "", messages: ""),
         ]
     }
-    func routeHandle(train: CoreTrain, from: CoreStation, to: CoreStation) throws -> CoreRoute { CoreRoute() }
+    func routeHandle(train: CoreTrain, from: CoreStation, to: CoreStation) throws -> CoreRoute {
+        let stops = try route(train: train, from: from, to: to)
+        return CoreRoute(stops: stops)
+    }
     func price(train: CoreTrain, travelClass: Int = 2, discountCode: Int32) throws -> Double {
         travelClass == 1 ? 169.00 : 79.00
     }
