@@ -3,7 +3,7 @@ import SwiftUI
 struct TrainPickerBar: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var expanded = false
+    @State private var expanded = true
 
     var body: some View {
         VStack(spacing: 8) {
